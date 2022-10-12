@@ -1,0 +1,51 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+import os 
+from optparse import OptionParser
+import os.path as osp
+def mkdirs(path):
+    try:
+        os.makedirs(path)
+    except:
+        pass
+
+def parse():
+    usage = 'usage: %prog <input-file> <out-dir>'
+    parser = OptionParser(usage)
+    parser.add_option('-i', "--input-file", dest = "input_path", help="input file")
+    parser.add_option("-o", "--out-dir", dest = "output_dir", help="output directory")
+
+    (options, args) = parser.parse_args()
+    return options.input_path, options.output_dir
+
+def load_multipleseq2dict_fromFASTA(filepath):
+    with open(filepath, "r") as f:
+        out_dict = {}
+        while True:
+            line = f.readline()
+            if line.startswith(">"):
+                # seqinfo = line[1:]
+                filename = line[1:].strip()  # this don't take complex header info of fasta file into account!!!!
+                out_dict[filename] = ''
+            elif line.strip() == '':
+                break
+            else:
+                out_dict[filename] += line.strip().strip(".")
+    return out_dict
+
+def main():
+    input_path, output_path = parse()
+    mkdirs(output_path)
+    fasta_dict = load_multipleseq2dict_fromFASTA(input_path)
+    print(f"spliting fasta file into {len(fasta_dict)} files at {output_path}")
+
+    for filename, seq in fasta_dict.items():
+        with open(osp.join(output_path, filename)+".fasta", "w") as f:
+            f.write(">"+filename)
+            f.write("\n")
+            f.write(seq)
+
+    print("finish")
+
+if __name__ == "__main__":
+    main()
