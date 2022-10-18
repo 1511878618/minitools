@@ -1,0 +1,47 @@
+#!/usr/bin/env python
+# -*-coding:utf-8 -*-
+
+import argparse
+import os
+import os.path as osp
+import shutil
+import sys 
+
+
+def mkdirs(path):
+    try:
+        os.makedirs(path)
+    except:
+        pass
+
+def getParser():
+    parser = argparse.ArgumentParser(description=f"-i file_A file_B -i file_C,file_D, this will cat file_A file_C into merged file as order into output dir, any combination of [file_A, file_B] [file_C, file_D].... will be done, example code:``combination -i *HPS10* -i *DUF247* -o one-one-complex/``")
+
+    parser.add_argument("-i", "--input", dest="target_dir", type=str, required=True, help = "for example ``combination -i Ol* A* -i S3L* -o ./test`` , this will automatically combination [Ol*, A*] with [S3L*]")  #  this will 
+
+    parser.add_argument("-o", "--output", dest="output_dir", type=str, required=True)
+
+    return parser
+
+if __name__ == "__main__":
+    parser = getParser()
+    args = parser.parse_args()
+    target_dir = args.target_dir
+    pdb_name = target_dir.split(os.sep)[-1]
+
+    output_dir = args.output_dir
+
+    mkdirs(output_dir)
+
+
+    osp.split(os.sep)
+
+    try:
+        _from = osp.join(target_dir, "ranked_0.pdb")
+        _to = osp.join(output_dir, pdb_name+".pdb")
+        print()
+        shutil.copy(_from, _to)
+    except IOError as e:
+        print("Unable to copy file. %s" % e)
+    except:
+        print("Unexpected error:", sys.exc_info())

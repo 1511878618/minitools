@@ -1,0 +1,43 @@
+#!/usr/bin/env python
+# -*-coding:utf-8 -*-
+
+import argparse
+import os
+import os.path as osp
+import re
+
+import pandas as pd
+
+
+def read_prodigy_txt(path):
+    datas = pd.read_csv(path, sep = ": ", header=None)
+    
+    return {osp.splitext(osp.split(datas.iloc[0, 1])[-1])[0]: {row[0]:row[1] for idx, row in datas.iloc[1:, :].iterrows()}}
+
+def getParser():
+    parser = argparse.ArgumentParser(description=f"sort prodigy outputs folder and output a csv files. all prodigy output should be redirected to a suffix by --suffix")
+
+    parser.add_argument("-i", "--input", dest="prodigy_output_filepath", type=str, required=True, help = "prodigy output folder")  #  this will 
+
+    parser.add_argument("-o", "--output", dest="output_csv", type=str, required=True)
+    parser.add_argument("-s", "--suffix", dest="suffix", type=str, default=".txt")
+
+
+    return parser
+
+
+if __name__ == "__main__":
+    parser = getParser()
+    args = parser.parse_args()
+
+    prodigy_output_filepath = args.prodigy_output_filepath
+    print(f"now using folder is {prodigy_output_filepath}")
+    output_csv = args.output_csv
+    print(f"sorted result will be in a csv file, location is {output_csv}")
+    suffix = args.suffix
+    print(f"suffix of prodigy file is {suffix}")
+
+    prodigy_list = [read_prodigy_txt(file) for file in os.listdir(prodigy_output_filepath) if file.endswith(suffix)]
+    prodigy_list.sort(key = lambda x: list(x.values())[0]["[++] Predicted binding affinity (kcal.mol-1)"], reverse=True)
+
+    pd.concat([pd.DataFrame(each_prodigy).T for each_prodigy in prodigy_list]).to_csv(output_csv)
