@@ -10,7 +10,6 @@ then
 fi
 
 PROGNAME=$0
-BASE_URL="https://files.rcsb.org/download"
 
 usage() {
   cat << EOF >&2
@@ -31,6 +30,8 @@ EOF
 }
 
 download() {
+  BASE_URL="https://files.rcsb.org/download"
+
   url="$BASE_URL/$1"
   out=$2/$1
   echo "Downloading $url to $out"
@@ -80,37 +81,37 @@ IFS=',' read -ra tokens <<< "$contents"
 
 if [ "$cif" == true ]
 then
-  parallel -j ${threads} download ${1}.cif.gz ${2} ::: "${tokens[@]}" ::: ${outdir}
+  parallel -j ${threads} download {1}.cif.gz {2} ::: "${tokens[@]}" ::: ${outdir}
   # download ${token}.cif.gz $outdir
 fi
 if [ "$pdb" == true ]
 then
-  parallel -j ${threads} download ${1}.pdb.gz ${2} ::: "${tokens[@]}" ::: ${outdir}
+  parallel -j ${threads} download {1}.pdb.gz {2} ::: "${tokens[@]}" ::: ${outdir}
   # download ${token}.pdb.gz $outdir
 fi
 if [ "$pdb1" == true ]
 then
-  parallel -j ${threads} download ${1}.pdb1.gz ${2} ::: "${tokens[@]}" ::: ${outdir}
+  parallel -j ${threads} download {1}.pdb1.gz {2} ::: "${tokens[@]}" ::: ${outdir}
   # download ${token}.pdb1.gz $outdir
 fi
 if [ "$xml" == true ]
 then
-  parallel -j ${threads} download ${1}.xml.gz ${2} ::: "${tokens[@]}" ::: ${outdir}
+  parallel -j ${threads} download {1}.xml.gz {2} ::: "${tokens[@]}" ::: ${outdir}
   # download ${token}.xml.gz $outdir
 fi
 if [ "$sf" == true ]
 then
-  parallel -j ${threads} download ${1}-sf.cif.gz ${2} ::: "${tokens[@]}" ::: ${outdir}
+  parallel -j ${threads} download {1}-sf.cif.gz {2} ::: "${tokens[@]}" ::: ${outdir}
   # download ${token}-sf.cif.gz $outdir
 fi
 if [ "$mr" == true ]
 then
-  parallel -j ${threads} download ${1}.mr.gz ${2} ::: "${tokens[@]}" ::: ${outdir}
+  parallel -j ${threads} download {1}.mr.gz {2} ::: "${tokens[@]}" ::: ${outdir}
   # download ${token}.mr.gz $outdir
 fi
 if [ "$mrstr" == true ]
 then
-  parallel -j ${threads} download ${1}_mr.str.gz ${2} ::: "${tokens[@]}" ::: ${outdir}
+  parallel -j ${threads} download {1}_mr.str.gz {2} ::: "${tokens[@]}" ::: ${outdir}
   # download ${token}_mr.str.gz $outdir
 fi
 

@@ -72,6 +72,7 @@ contents=$(cat $listfile)
 
 # see https://stackoverflow.com/questions/918886/how-do-i-split-a-string-on-a-delimiter-in-bash#tab-top
 IFS=',' read -ra tokens <<< "$contents"
+
 for token in "${tokens[@]}"
 do
   if [ "$cif" == true ]
