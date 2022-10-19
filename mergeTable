@@ -1,0 +1,64 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+import pandas as pd 
+import argparse
+from io import StringIO
+import sys
+from signal import signal, SIGPIPE, SIG_DFL
+
+signal(SIGPIPE,SIG_DFL) #prevent IOError: [Errno 32] Broken pipe. If pipe closed by 'head'.
+
+def getParser():
+    parser = argparse.ArgumentParser(description="parse SIFTS API output json at https://www.ebi.ac.uk/pdbe/api/doc/sifts.html, extract UniProt mapping results from SIFTS Mappings to a csv file of all results")
+    parser.add_argument("-A", dest="A", required=False, help="left table", type=str)
+    parser.add_argument("-B", dest="B", required=False, help="right table", type=str)
+
+    parser.add_argument("--col_A", dest="col_A", default=0, type=int, help="col_A")
+    parser.add_argument("--col_B", dest="col_B", default=0, type=int, help="col_B")
+
+    parser.add_argument("--header_A", dest="header_A", action="store_true", help="header_in A")
+    parser.add_argument("--header_B", dest="header_B", action="store_true", help="header_in B")
+
+    parser.add_argument("--sep_A", dest="sep_A", default="\t", type=str, help="sep of A")
+    parser.add_argument("--sep_B", dest="sep_B", default="\t", type=str, help="sep of B")
+    # parser.add_argument("-o", "--output", dest="output_dir", type=str, default="UniProt_mapping.csv")
+
+    return parser
+
+def merge(A_df:pd.DataFrame, B_df:pd.DataFrame, left_col:int = 0, right_col:int = 0, how:str = "inner", header_in:bool = False):
+
+    merge_df = A_df.merge(B_df, left_on=left_col, right_on=right_col, how=how)
+    return merge_df
+
+def load_stdin2df(sep="\t", header=None):
+    with StringIO(sys.stdin.read()) as f:
+        return pd.read_csv(f, sep=sep, header=header)
+    
+if __name__ == "__main__":
+    parser = getParser()
+    args = parser.parse_args()
+
+    A = args.A
+    B = args.B 
+
+    sep_A = args.sep_A
+    sep_B = args.sep_B
+
+    header_A = 0 if args.header_A else None
+    header_B = 0 if args.header_B else None
+
+    if A is None and B:
+        df_A = load_stdin2df(sep=sep_A, header=header_A)
+        df_B = pd.read_csv(B, sep=sep_B, header=header_B) 
+    elif B is None and A:
+        df_A =  pd.read_csv(A, sep=sep_A, header=header_A)
+        df_B = load_stdin2df(sep=sep_B, header=header_B)
+    elif A is None and B is None:
+        raise TypeError(f"-A or -B should be specific as at least one")
+    
+    col_A = args.col_A
+    col_B = args.col_B
+
+    merge_df = merge(A_df = df_A, B_df = df_B, left_col=col_A, right_col=col_B, how="inner", header_in=False)
+    if not merge_df.empty:
+        merge_df.to_string(sys.stdout, index=None, header=None)
