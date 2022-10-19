@@ -5,7 +5,9 @@ import argparse
 from io import StringIO
 import sys
 from signal import signal, SIGPIPE, SIG_DFL
+import warnings
 
+warnings.filterwarnings("ignore")
 signal(SIGPIPE,SIG_DFL) #prevent IOError: [Errno 32] Broken pipe. If pipe closed by 'head'.
 
 def getParser():
@@ -30,9 +32,9 @@ def merge(A_df:pd.DataFrame, B_df:pd.DataFrame, left_col:int = 0, right_col:int 
     merge_df = A_df.merge(B_df, left_on=left_col, right_on=right_col, how=how)
     return merge_df
 
-def load_stdin2df(sep="\t", header=None):
+def load_stdin2df(sep="\t", skiprows=0):
     with StringIO(sys.stdin.read()) as f:
-        return pd.read_csv(f, sep=sep, header=header)
+        return pd.read_csv(f, sep=sep, skiprows=skiprows, index_col=None, header=None)
     
 if __name__ == "__main__":
     parser = getParser()
@@ -44,15 +46,19 @@ if __name__ == "__main__":
     sep_A = args.sep_A
     sep_B = args.sep_B
 
-    header_A = 0 if args.header_A else None
-    header_B = 0 if args.header_B else None
+    skip_A = 1 if args.header_A else 0
+    skip_B = 1 if args.header_B else 0
 
     if A is None and B:
-        df_A = load_stdin2df(sep=sep_A, header=header_A)
-        df_B = pd.read_csv(B, sep=sep_B, header=header_B) 
+        df_A = load_stdin2df(sep=sep_A, skiprows = skip_A)
+        df_B = pd.read_csv(B, sep=sep_B, skiprows = skip_B, index_col=None, header=None) 
     elif B is None and A:
-        df_A =  pd.read_csv(A, sep=sep_A, header=header_A)
-        df_B = load_stdin2df(sep=sep_B, header=header_B)
+        df_A = pd.read_csv(A, sep=sep_A, skiprows = skip_A, index_col=None,header=None)
+        df_B = load_stdin2df(sep=sep_B, skiprows = skip_B)
+    elif A and B:
+        df_A = pd.read_csv(A, sep=sep_A, skiprows = skip_A, index_col=None, header=None)
+        df_B = pd.read_csv(B, sep=sep_B, skiprows = skip_B, index_col=None, header=None) 
+
     elif A is None and B is None:
         raise TypeError(f"-A or -B should be specific as at least one")
     
