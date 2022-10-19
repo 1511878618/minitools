@@ -14,7 +14,8 @@ def get_SIFTS(accession, fields="all"):
         base_url = "https://www.ebi.ac.uk/pdbe/api/mappings/"
     else:
         raise NotImplementedError
-
+    url = base_url+accession
+    print(url)
     callback = requests.get(base_url+accession)
 
     if callback.status_code != 200:
