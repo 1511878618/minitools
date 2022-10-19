@@ -76,11 +76,11 @@ if __name__ == "__main__":
         raise TypeError(f"-A or -B should be specific as at least one")
 
     col_A = df_A.columns[args.col_A] 
+    col_B = df_B.columns[args.col_B]
 
-    df_B.rename({df_B.columns[args.col_B]:df_A.columns[args.col_A]}, axis=1, inplace=True)  # rename B -> A at col_B -> col_A
-    col_B = df_B.columns[args.col_B] 
-
+    df_B.rename({col_B:col_A}, axis=1, inplace=True)  # rename B -> A at col_B -> col_A
+    col_B = col_A
     merge_df = pd.merge(left=df_A, right=df_B, left_on=col_A, right_on=col_B, how=how)
-
+    merge_df.to_csv("test.out1", sep="\t")
     if not merge_df.empty:
-        merge_df.to_string(sys.stdout, index=None, header=True if any([hasHeader_A, hasHeader_B]) else False)
+        merge_df.to_csv(sys.stdout, sep="\t", index=None, header=True if any([hasHeader_A, hasHeader_B]) else False)
