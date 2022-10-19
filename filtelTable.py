@@ -14,18 +14,14 @@ signal(SIGPIPE,SIG_DFL) #prevent IOError: [Errno 32] Broken pipe. If pipe closed
 
 def getParser():
     parser = argparse.ArgumentParser(description="parse SIFTS API output json at https://www.ebi.ac.uk/pdbe/api/doc/sifts.html, extract UniProt mapping results from SIFTS Mappings to a csv file of all results")
-    parser.add_argument("-A", dest="A", required=False, help="left table", type=str)
-    parser.add_argument("-B", dest="B", required=False, help="right table", type=str)
+    parser.add_argument("-t", dest="table", required=False, help="table", type=str)
+    parser.add_argument("-f", dest="filter_table", required=False, help="filters", type=str)
 
-    parser.add_argument("--col_A", dest="col_A", default=0, type=int, help="col_A")
-    parser.add_argument("--col_B", dest="col_B", default=0, type=int, help="col_B")
+    parser.add_argument("--col", dest="col", default=0, type=int, help="col_A")
 
-    parser.add_argument("--header_A", dest="header_A", action="store_true", help="header_in A")
-    parser.add_argument("--header_B", dest="header_B", action="store_true", help="header_in B")
+    parser.add_argument("--header", dest="header", action="store_true", help="header_in A")
 
-    parser.add_argument("--sep_A", dest="sep_A", default="\t", type=str, help="sep of A")
-    parser.add_argument("--sep_B", dest="sep_B", default="\t", type=str, help="sep of B")
-    # parser.add_argument("-o", "--output", dest="output_dir", type=str, default="UniProt_mapping.csv")
+    parser.add_argument("--sep", dest="sep", default="\t", type=str, help="sep of A")
 
     return parser
 
@@ -34,16 +30,16 @@ def merge(A_df:pd.DataFrame, B_df:pd.DataFrame, left_col:int = 0, right_col:int 
     merge_df = A_df.merge(B_df, left_on=left_col, right_on=right_col, how=how)
     return merge_df
 
-def load_stdin2df(sep="\t", skiprows=0):
+def load_stdin2df(sep="\t", header=None):
     with StringIO(sys.stdin.read()) as f:
-        return pd.read_csv(f, sep=sep, skiprows=skiprows, index_col=None, header=None)
+        return pd.read_csv(f, sep=sep, index_col=None, header=header)
     
 if __name__ == "__main__":
     parser = getParser()
     args = parser.parse_args()
 
-    A = args.A
-    B = args.B 
+    A = args.table
+    B = args.filter_table
 
     sep_A = args.sep_A
     sep_B = args.sep_B
