@@ -16,15 +16,24 @@ def flatten_list(x:list):
     return list(chain.from_iterable(x))
 
 def getParser():
-    parser = argparse.ArgumentParser(description="parse SIFTS api output json, extract UniProt mapping results to a csv file")
-    parser.add_argument("-i", "--files", dest="files", required=False, help="files", action="append", nargs="+", default=None)
-    parser.add_argument("-f", "--fold", dest="folder", required=False, help="specific a folder, conflict with -i", default=None)
+    parser = argparse.ArgumentParser(description="parse SIFTS API output json at https://www.ebi.ac.uk/pdbe/api/doc/sifts.html, extract UniProt mapping results from SIFTS Mappings to a csv file of all results")
+    parser.add_argument("-i", "--files", dest="files", required=False, help="json files", action="append", nargs="+", default=None)
+    parser.add_argument("-f", "--fold", dest="folder", required=False, help="specific a folder of json files, conflict with -i", default=None)
     parser.add_argument("-o", "--output", dest="output_dir", type=str, default="UniProt_mapping.csv")
     parser.add_argument("-p", "--processes", dest="processes", type=int, help="processes num", default=4)
     parser.add_argument("-l", "--log", dest="log_file", default="SIFTS_Uniprot_parse.log", help="log file path")
     return parser
 
 def load_json(filepath:str):
+    """
+    load_json load json file
+
+    Args:
+        filepath (str): _description_
+
+    Returns:
+        Dict: python dict of json
+    """
     with open(filepath, "r") as f:
         return json.loads(f.read())
 
@@ -38,11 +47,13 @@ def parse_SIFTSMapping_json(filepath:str):
     UniProt_json = SIFTS_json[accession]["UniProt"]
 
     if not UniProt_json:
-        return pd.DataFrame({"UniProt Accession":[accession]})
+        # return pd.DataFrame({"UniProt Accession":[accession]})
+        return pd.DataFrame()
         # exit()
     UniProt_Accession = list(UniProt_json.keys())[0]
 
     UniProt_Accession_mapping_df = pd.json_normalize(UniProt_json[UniProt_Accession])
+    UniProt_Accession_mapping_df.insert(0, column="PDB Accession", value=accession)
     UniProt_Accession_mapping_df.insert(0, column="UniProt Accession", value=UniProt_Accession)
 
 
