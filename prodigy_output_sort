@@ -10,18 +10,31 @@ import pandas as pd
 
 
 def read_prodigy_txt(path):
-    datas = pd.read_csv(path, sep = ": ", header=None)
-    
-    return {osp.splitext(osp.split(datas.iloc[0, 1])[-1])[0]: {row[0]:row[1] for idx, row in datas.iloc[1:, :].iterrows()}}
+    datas = pd.read_csv(path, sep=": ", header=None)
+
+    return {
+        osp.splitext(osp.split(datas.iloc[0, 1])[-1])[0]: {
+            row[0]: row[1] for idx, row in datas.iloc[1:, :].iterrows()
+        }
+    }
+
 
 def getParser():
-    parser = argparse.ArgumentParser(description=f"sort prodigy outputs folder and output a csv files. all prodigy output should be redirected to a suffix by --suffix")
+    parser = argparse.ArgumentParser(
+        description=f"sort prodigy outputs folder and output a csv files. all prodigy output should be redirected to a suffix by --suffix"
+    )
 
-    parser.add_argument("-i", "--input", dest="prodigy_output_filepath", type=str, required=True, help = "prodigy output folder")  #  this will 
+    parser.add_argument(
+        "-i",
+        "--input",
+        dest="prodigy_output_filepath",
+        type=str,
+        required=True,
+        help="prodigy output folder",
+    )  #  this will
 
     parser.add_argument("-o", "--output", dest="output_csv", type=str, required=True)
     parser.add_argument("-s", "--suffix", dest="suffix", type=str, default=".txt")
-
 
     return parser
 
@@ -37,7 +50,18 @@ if __name__ == "__main__":
     suffix = args.suffix
     print(f"suffix of prodigy file is {suffix}")
 
-    prodigy_list = [read_prodigy_txt(file) for file in os.listdir(prodigy_output_filepath) if file.endswith(suffix)]
-    prodigy_list.sort(key = lambda x: list(x.values())[0]["[++] Predicted binding affinity (kcal.mol-1)"], reverse=True)
+    prodigy_list = [
+        read_prodigy_txt(file)
+        for file in os.listdir(prodigy_output_filepath)
+        if file.endswith(suffix)
+    ]
+    prodigy_list.sort(
+        key=lambda x: list(x.values())[0][
+            "[++] Predicted binding affinity (kcal.mol-1)"
+        ],
+        reverse=True,
+    )
 
-    pd.concat([pd.DataFrame(each_prodigy).T for each_prodigy in prodigy_list]).to_csv(output_csv)
+    pd.concat([pd.DataFrame(each_prodigy).T for each_prodigy in prodigy_list]).to_csv(
+        output_csv
+    )
