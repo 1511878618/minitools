@@ -26,6 +26,7 @@ def getParser():
     parser.add_argument("--sep_left", dest="sep_A", default="\t", type=str, help="sep of left")
     parser.add_argument("--sep_right", dest="sep_B", default="\t", type=str, help="sep of right")
 
+    parser.add_argument("--diff", dest="is_diff", action="store_true", help="left - right")
     parser.add_argument("--how", dest="how", default="inner", type=str, help="""
     how : {'left', 'right', 'outer', 'inner', 'cross'}, default 'inner'
     Type of merge to be performed.
@@ -61,7 +62,7 @@ if __name__ == "__main__":
     header_B = 0 if hasHeader_B else None
 
     how = args.how
-
+    IS_DIFF = args.is_diff 
     if A is None and B:
         df_A = load_stdin2df(sep=sep_A, header = header_A, index_col=None, dtype=object)
         df_B = pd.read_csv(B, sep=sep_B, header = header_B, index_col=None, dtype=object) 
@@ -80,7 +81,22 @@ if __name__ == "__main__":
 
     df_B.rename({col_B:col_A}, axis=1, inplace=True)  # rename B -> A at col_B -> col_A
     col_B = col_A
-    merge_df = pd.merge(left=df_A, right=df_B, left_on=col_A, right_on=col_B, how=how)
-    merge_df.to_csv("test.out1", sep="\t")
-    if not merge_df.empty:
-        merge_df.to_csv(sys.stdout, sep="\t", index=None, header=True if any([hasHeader_A, hasHeader_B]) else False)
+
+    if not IS_DIFF:
+        merge_df = pd.merge(left=df_A, right=df_B, left_on=col_A, right_on=col_B, how=how)
+        merge_df.to_csv("test.out1", sep="\t")
+        if not merge_df.empty:
+            merge_df.to_csv(sys.stdout, sep="\t", index=None, header=True if any([hasHeader_A, hasHeader_B]) else False)
+    if IS_DIFF:
+        left_key = set(df_A[col_A])
+        right_key = set(df_B[col_B])
+
+        diff_left_minus_right = left_key.difference(right_key)
+
+        bool_filter = df_A[col_A].apply(lambda x: x in diff_left_minus_right)
+        out_df = df_A[bool_filter]
+        
+        out_df.to_csv(sys.stdout, sep="\t", index=None, header=True if hasHeader_A else False)
+
+
+
