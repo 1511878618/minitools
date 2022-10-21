@@ -126,7 +126,7 @@ if __name__ == "__main__":
             merge_df.to_csv(
                 sys.stdout,
                 sep="\t",
-                index=None,
+                index=False,
                 header=True if any([hasHeader_A, hasHeader_B]) else False,
             )
     if IS_DIFF:
@@ -139,5 +139,5 @@ if __name__ == "__main__":
         out_df = df_A[bool_filter]
 
         out_df.to_csv(
-            sys.stdout, sep="\t", index=None, header=True if hasHeader_A else False
+            sys.stdout, sep="\t", index=False, header=True if hasHeader_A else False
         )
