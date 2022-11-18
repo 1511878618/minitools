@@ -30,7 +30,7 @@ def getParser():
         dest="prodigy_output_filepath",
         type=str,
         required=True,
-        help="prodigy output folder",
+        help="prodigy input folder",
     )  #  this will
 
     parser.add_argument("-o", "--output", dest="output_csv", type=str, required=True)

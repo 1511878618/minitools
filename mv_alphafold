@@ -55,3 +55,13 @@ if __name__ == "__main__":
         print("Unable to copy file. %s" % e)
     except:
         print("Unexpected error:", sys.exc_info())
+
+    # for i in range(5):
+    #     try:
+    #         _from = osp.join(target_dir, f"ranked_{i}.pdb")
+    #         _to = osp.join(output_dir, pdb_name + f"_{i}.pdb")
+    #         shutil.copy(_from, _to)
+    #     except IOError as e:
+    #         print("Unable to copy file. %s" % e)
+    #     except:
+    #         print("Unexpected error:", sys.exc_info())

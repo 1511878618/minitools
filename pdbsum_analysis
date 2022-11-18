@@ -1,0 +1,321 @@
+#!/usr/bin/env python
+# -*-coding:utf-8 -*-
+import argparse
+import os
+import os.path as osp
+import re
+import shutil
+from itertools import permutations
+from multiprocessing import Pool
+
+import pandas as pd
+
+#  由于pdbsum软件需要配置，所以这个地方的路径应当是pdbsum软件配置的输出路径，
+#  它的输出保存路径是在pdb code中的4个字母中的中间2个字母的文件夹下面，因此，随机生成的PDB code 应该是： xABx， 这样保存才在output/AB文件继续安眠
+FOLDER = "AB"
+PDB_SUM_OUTPUT = f"/p300s/wangmx_group/xutingfeng/software/pdbsum1/output/{FOLDER}"
+PERMUTATIONS_LIST = list(
+    permutations("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789", 2)
+)
+
+
+#  extract protprot data
+def load_single_FASTA(filepath):
+    with open(filepath, "r") as f:
+        out_dict = {}
+        while True:
+            line = f.readline()
+            if line.startswith(">"):
+                # seqinfo = line[1:]
+                filename = line[
+                    1:
+                ].strip()  # this don't take complex header info of fasta file into account!!!!
+                out_dict[filename] = ""
+            elif line.strip() == "":
+                break
+            else:
+                out_dict[filename] += line.strip().strip(".")
+    result = [[name, seq] for name, seq in out_dict.items()]
+    return result[0]
+
+
+def extract_chain_fasta(uniprot_dat_dir):
+    """从PDBsum输出的chain和序列的对应关系中获取chain:seq
+
+    Args:
+        uniprot_dat_dir (_type_): _description_
+
+    Returns:
+        dict: {chain_A:seq, chain_B:seq}
+    """
+
+    uniprot_dat_df = pd.read_csv(uniprot_dat_dir, sep="\s+", index_col=0, header=None)
+
+    uniprot_dat_df_dic = uniprot_dat_df.to_dict()[1]
+
+    return {
+        uniprot_dat_df_dic["UNIPLOT_CHAIN[1]"]: uniprot_dat_df_dic[
+            "UNIPLOT_PDB_SEQ[1]"
+        ],
+        uniprot_dat_df_dic["UNIPLOT_CHAIN[2]"]: uniprot_dat_df_dic[
+            "UNIPLOT_PDB_SEQ[2]"
+        ],
+    }
+
+
+def check_chain_seqname(single_data_dir, chain_seq_list):
+    single_fasta_dir_list = [
+        osp.join(single_data_dir, single_data)
+        for single_data in os.listdir(single_data_dir)
+    ]
+
+    mapping_result = {}
+    for chain_name, chain_seq in chain_seq_list.items():
+        print(f"finding chain_name {chain_name}")
+        for fasta_dir in single_fasta_dir_list:
+            seq_name, seq = load_single_FASTA(fasta_dir)
+
+            if chain_seq == seq:
+                mapping_result[chain_name] = seq_name
+                print(f"{chain_name} is {seq_name}")
+
+                break
+            else:
+                print(f"{chain_name} is not {seq_name}")
+    if "A" not in mapping_result:
+        mapping_result["A"] = "unk"
+    if "B" not in mapping_result:
+        mapping_result["B"] = "unk"
+
+    return mapping_result
+
+
+def parse_iface_pdbsum(iface_txt_dir):
+    interaction_type = [
+        "Hydrogen bonds",
+        "Non-bonded contacts",
+        "Salt bridges",
+        "Disulphide bonds",
+    ]
+
+    interaction_list = []
+
+    with open(iface_txt_dir, "r") as f:
+        #  使用的header和对应解析后的index
+        header = [
+            "Atom_no._A",
+            "Atom_name_A",
+            "Res_name_A",
+            "Res_no._A",
+            "Atom_no._B",
+            "Atom_name_B",
+            "Res_name_B",
+            "Res_no._B",
+            "Distance",
+            "interaction_type",
+        ]
+        inter_line_index = [1, 2, 3, 4, 7, 8, 9, 10, 12]
+
+        aa_interaction_pdbsum_pattern = r".*<-->.*"  #   1.   1549  NZ  LYS   92    A   <-->  6193  O   ALA  182    B      2.68
+        current_interaction_type = None
+
+        while True:
+            current_line = f.readline()
+
+            if not current_line:
+                break
+
+            if (current_line := current_line.strip()) in interaction_type:
+                current_interaction_type = current_line
+
+            elif (
+                re.match(aa_interaction_pdbsum_pattern, current_line)
+                and current_interaction_type
+            ):
+
+                result_list = re.split(r"[ ]+", current_line.strip())
+                # pd.Series([result_list[i] for i in inter_line_index]+[current_interaction_type], index=header)
+                # interaction_list.append(pd.Series([result_list[i] for i in inter_line_index]+[current_interaction_type], index=header))
+
+                current_interaction_series = pd.Series(
+                    [
+                        "A",
+                        result_list[4],
+                        "B",
+                        result_list[10],
+                        current_interaction_type,
+                        result_list[12],
+                    ],
+                    index=[
+                        "chain_A_name",
+                        "chian_A_resName",
+                        "chain_B_name",
+                        "chain_B_resName",
+                        "interaction_type",
+                        "distance",
+                    ],
+                )
+                interaction_list.append(current_interaction_series)
+
+    return interaction_list
+
+
+def extract_protprot(
+    pdbsum_output_file_dir,
+    save_folder=None,
+    single_data_dir="/p300s/wangmx_group/xutingfeng/alphafold/input/hhq/dataset/single",
+    chain_selections=["AB"],
+):
+
+    root_paht, protein_name = osp.split(pdbsum_output_file_dir)
+    protein_name, suffix = osp.splitext(protein_name)
+    print(f"extracting {protein_name}")
+    for chain_selection in chain_selections:
+        prot_prot_dir = osp.join(
+            pdbsum_output_file_dir, "protprot", f"iface_{chain_selection}.txt"
+        )
+
+        uniprot_dat_dir = osp.join(pdbsum_output_file_dir, "seqdata", "uniplot.dat")
+
+        if osp.isfile(prot_prot_dir):
+            # protein_name_left =
+
+            prot_prot_df = pd.DataFrame(parse_iface_pdbsum(prot_prot_dir))  # 获取所有的数据
+            # 更改chain名
+            chain_dcit = extract_chain_fasta(uniprot_dat_dir)
+            mapping_result = check_chain_seqname(single_data_dir, chain_dcit)
+            prot_prot_df["chain_A_name"] = mapping_result["A"]
+            prot_prot_df["chain_B_name"] = mapping_result["B"]
+            print(f"sueecessfully extract {protein_name}")
+            if save_folder:
+                save_dir = osp.join(save_folder, f"{protein_name}.csv")
+                prot_prot_df.to_csv(save_dir, index=False)
+            else:
+                return prot_prot_df
+        else:
+            print(f"not found {prot_prot_dir}")
+
+
+def extract_protprot_pdbsum(pdbsum_output_folder, single_data_dir, save_path):
+    pdbsum_output_dir_list = [
+        osp.join(pdbsum_output_folder, folder)
+        for folder in os.listdir(pdbsum_output_folder)
+        if osp.isdir(osp.join(pdbsum_output_folder, folder))
+    ]
+    result_df = [
+        extract_protprot(pdbsum_output_file_dir, single_data_dir=single_data_dir)
+        for pdbsum_output_file_dir in pdbsum_output_dir_list
+    ]
+    result_df = (
+        pd.concat(result_df)
+        .drop_duplicates(
+            subset=[
+                "chain_A_name",
+                "chian_A_resName",
+                "chain_B_name",
+                "chain_B_resName",
+            ]
+        )
+        .reset_index(drop=True)
+    )
+    result_df.to_csv(save_path, index=False)
+    return result_df
+
+
+def getParser():
+    parser = argparse.ArgumentParser(
+        description=f"pdbsum1 analysis and mv file to given path. extract protprot and merge this data into csv file at output folder. Note: protein complex should only have chain A and Chain B!!"
+    )
+
+    parser.add_argument(
+        "-i",
+        "--input",
+        dest="pdb_file_folder",
+        type=str,
+        required=True,
+        help="input folder",
+    )  #  this will
+    parser.add_argument(
+        "-r",
+        "--ref_single_data_dir",
+        dest="single_data_dir",
+        type=str,
+        required=True,
+        help="extract all interface of complex, however the chain is not clear specift to raw single fasta, so this file is used to mapping chain to fasta name and output csv file into output dir with name protprot.csv",
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        dest="output",
+        type=str,
+        required=True,
+        help="save pdbsum analysis root path at output folder",
+    )
+    parser.add_argument("-p", "--processes", dest="processes", type=int, default=5)
+
+    return parser
+
+
+def multiprocessing_map(func, iter_list, processes=5):
+    pool = Pool(processes)
+    res = pool.map(func, iter_list)
+    return res
+
+
+def pdbsum_analysis(pdb_code_file_path_list):
+    pdb_code, pdb_file_path = pdb_code_file_path_list
+    cmd = f"pdbsum1 {pdb_file_path} {pdb_code}"
+    f = os.system(cmd)
+
+
+def pdbsum_output_mv(pdb_code_file_path_list, output_dir):
+    pdb_code, pdb_file_path = pdb_code_file_path_list
+
+    root, pdb_name = osp.split(pdb_file_path)
+    pdb_name, tail = osp.splitext(pdb_name)
+
+    if os.path.isdir(f"{PDB_SUM_OUTPUT}/{pdb_code}"):
+        src = f"{PDB_SUM_OUTPUT}/{pdb_code}"
+        dst = f"{output_dir}/{pdb_name}"
+        print(f"{src} -> {dst}")
+        shutil.move(src, dst)
+
+
+if __name__ == "__main__":
+    parser = getParser()
+    args = parser.parse_args()
+
+    pdb_file_folder = args.pdb_file_folder
+    output = args.output
+    single_data_dir = args.single_data_dir
+    processes = args.processes
+
+    os.system(f"mkdir -p {output}")
+
+    pdb_files = [
+        osp.join(pdb_file_folder, pdb_file)
+        for pdb_file in os.listdir(pdb_file_folder)
+        if pdb_file.endswith(".pdb")
+    ]
+
+    persudo_pdbcode_list = [
+        [f"{PERMUTATIONS_LIST[idx][0]}{FOLDER}{PERMUTATIONS_LIST[idx][1]}", pdb_file]
+        for idx, pdb_file in enumerate(pdb_files)
+    ]
+
+    multiprocessing_map(pdbsum_analysis, persudo_pdbcode_list, processes=5)
+
+    for pdbcode_list in persudo_pdbcode_list:
+        pdbsum_output_mv(pdbcode_list, output)
+
+    print("successful mv!!!!!")
+
+    pdbsum_output_folder = output
+    single_data_dir = single_data_dir
+    save_path = osp.join(output, "protprot.csv")
+
+    extract_protprot_pdbsum(
+        pdbsum_output_folder=pdbsum_output_folder,
+        single_data_dir=single_data_dir,
+        save_path=save_path,
+    )

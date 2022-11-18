@@ -1,0 +1,60 @@
+#!/usr/bin/env python
+# -*-coding:utf-8 -*-
+
+import os
+import os.path as osp
+import argparse
+
+
+def load_fasta(fasta_path: str, return_header=False):
+    header_list = []
+    seq_list = []
+    with open(fasta_path, "r") as f:
+        while True:
+            line = f.readline().strip()
+            if line and line.startswith(">"):
+                header_list.append(line)
+            elif line:
+                seq_list.append(line)
+            else:
+                break
+    if return_header:
+        return header_list, seq_list
+    else:
+        return seq_list
+
+
+def getParser():
+    parser = argparse.ArgumentParser(
+        description="fasta file with multiple sequence to esmfold_multimer type, which use ':' to connect chains"
+    )
+
+    parser.add_argument(
+        "-i", "--input", dest="fasta_file", type=str, help="fasta file path"
+    )
+
+    parser.add_argument(
+        "-o",
+        "--output",
+        dest="output_dir",
+        type=str,
+        help="output_fasta file will be located at this folder",
+    )
+
+    return parser
+
+
+if __name__ == "__main__":
+    parser = getParser()
+    args = parser.parse_args()
+
+    fasta_file = args.fasta_file
+    output_dir = args.output_dir
+
+    prefix, output_header = osp.split(fasta_file)
+    output_header, suffix = osp.splitext(output_header)
+    fasta = load_fasta(fasta_file, return_header=False)
+
+    with open(osp.join(output_dir, output_header + ".fasta"), "w") as f:
+        f.write(f">{output_header}\n")
+        f.write(":".join(fasta))
