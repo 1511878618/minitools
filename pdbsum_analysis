@@ -19,6 +19,12 @@ PERMUTATIONS_LIST = list(
 )
 
 
+def extract_file_name(absolute_path):
+    filename_with_suffix = osp.split(absolute_path)[-1]
+    filename = osp.splitext(filename_with_suffix)[0]
+    return filename
+
+
 #  extract protprot data
 def load_single_FASTA(filepath):
     with open(filepath, "r") as f:
@@ -148,7 +154,7 @@ def parse_iface_pdbsum(iface_txt_dir):
                     ],
                     index=[
                         "chain_A_name",
-                        "chian_A_resName",
+                        "chain_A_resName",
                         "chain_B_name",
                         "chain_B_resName",
                         "interaction_type",
@@ -162,8 +168,8 @@ def parse_iface_pdbsum(iface_txt_dir):
 
 def extract_protprot(
     pdbsum_output_file_dir,
+    # single_data_dir,
     save_folder=None,
-    single_data_dir="/p300s/wangmx_group/xutingfeng/alphafold/input/hhq/dataset/single",
     chain_selections=["AB"],
 ):
 
@@ -175,15 +181,20 @@ def extract_protprot(
             pdbsum_output_file_dir, "protprot", f"iface_{chain_selection}.txt"
         )
 
-        uniprot_dat_dir = osp.join(pdbsum_output_file_dir, "seqdata", "uniplot.dat")
+        # uniprot_dat_dir = osp.join(pdbsum_output_file_dir, "seqdata", "uniplot.dat")
 
         if osp.isfile(prot_prot_dir):
             # protein_name_left =
 
             prot_prot_df = pd.DataFrame(parse_iface_pdbsum(prot_prot_dir))  # 获取所有的数据
             # 更改chain名
-            chain_dcit = extract_chain_fasta(uniprot_dat_dir)
-            mapping_result = check_chain_seqname(single_data_dir, chain_dcit)
+            # chain_dcit = extract_chain_fasta(uniprot_dat_dir)
+            # mapping_result = check_chain_seqname(single_data_dir, chain_dcit)
+
+            chain_A_name, chain_B_name = pdbsum_output_file_dir.split(":")
+            mapping_result = {"A": extract_file_name(chain_A_name), "B": chain_B_name}
+
+            print(mapping_result)
             prot_prot_df["chain_A_name"] = mapping_result["A"]
             prot_prot_df["chain_B_name"] = mapping_result["B"]
             print(f"sueecessfully extract {protein_name}")
@@ -196,14 +207,22 @@ def extract_protprot(
             print(f"not found {prot_prot_dir}")
 
 
-def extract_protprot_pdbsum(pdbsum_output_folder, single_data_dir, save_path):
+def extract_protprot_pdbsum(
+    pdbsum_output_folder,
+    # single_data_dir,
+    save_path,
+):
+
     pdbsum_output_dir_list = [
         osp.join(pdbsum_output_folder, folder)
         for folder in os.listdir(pdbsum_output_folder)
         if osp.isdir(osp.join(pdbsum_output_folder, folder))
     ]
     result_df = [
-        extract_protprot(pdbsum_output_file_dir, single_data_dir=single_data_dir)
+        extract_protprot(
+            pdbsum_output_file_dir,
+            # single_data_dir=single_data_dir
+        )
         for pdbsum_output_file_dir in pdbsum_output_dir_list
     ]
     result_df = (
@@ -211,7 +230,7 @@ def extract_protprot_pdbsum(pdbsum_output_folder, single_data_dir, save_path):
         .drop_duplicates(
             subset=[
                 "chain_A_name",
-                "chian_A_resName",
+                "chain_A_resName",
                 "chain_B_name",
                 "chain_B_resName",
             ]
@@ -235,14 +254,14 @@ def getParser():
         required=True,
         help="input folder",
     )  #  this will
-    parser.add_argument(
-        "-r",
-        "--ref_single_data_dir",
-        dest="single_data_dir",
-        type=str,
-        required=True,
-        help="extract all interface of complex, however the chain is not clear specift to raw single fasta, so this file is used to mapping chain to fasta name and output csv file into output dir with name protprot.csv",
-    )
+    # parser.add_argument(
+    #     "-r",
+    #     "--ref_single_data_dir",
+    #     dest="single_data_dir",
+    #     type=str,
+    #     required=True,
+    #     help="extract all interface of complex, however the chain is not clear specift to raw single fasta, so this file is used to mapping chain to fasta name and output csv file into output dir with name protprot.csv",
+    # )
     parser.add_argument(
         "-o",
         "--output",
@@ -287,7 +306,7 @@ if __name__ == "__main__":
 
     pdb_file_folder = args.pdb_file_folder
     output = args.output
-    single_data_dir = args.single_data_dir
+    # single_data_dir = args.single_data_dir
     processes = args.processes
 
     os.system(f"mkdir -p {output}")
@@ -311,11 +330,11 @@ if __name__ == "__main__":
     print("successful mv!!!!!")
 
     pdbsum_output_folder = output
-    single_data_dir = single_data_dir
+    # single_data_dir = single_data_dir
     save_path = osp.join(output, "protprot.csv")
 
     extract_protprot_pdbsum(
         pdbsum_output_folder=pdbsum_output_folder,
-        single_data_dir=single_data_dir,
+        # single_data_dir=single_data_dir,
         save_path=save_path,
     )

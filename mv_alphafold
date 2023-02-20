@@ -17,7 +17,7 @@ def mkdirs(path):
 
 def getParser():
     parser = argparse.ArgumentParser(
-        description=f"-i file_A file_B -i file_C,file_D, this will cat file_A file_C into merged file as order into output dir, any combination of [file_A, file_B] [file_C, file_D].... will be done, example code:``combination -i *HPS10* -i *DUF247* -o one-one-complex/``"
+        description=f"-i alphafold2 output dir -o pdb_save_path, rank_0 will be saved "
     )
 
     parser.add_argument(
@@ -26,7 +26,7 @@ def getParser():
         dest="target_dir",
         type=str,
         required=True,
-        help="for example ``combination -i Ol* A* -i S3L* -o ./test`` , this will automatically combination [Ol*, A*] with [S3L*]",
+        help=" alphafold2 output dir",
     )  #  this will
 
     parser.add_argument("-o", "--output", dest="output_dir", type=str, required=True)

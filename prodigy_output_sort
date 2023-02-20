@@ -10,11 +10,11 @@ import pandas as pd
 
 
 def read_prodigy_txt(path):
-    datas = pd.read_csv(path, sep=": ", header=None)
+    datas = pd.read_csv(path, sep=":", header=None)
 
     return {
-        osp.splitext(osp.split(datas.iloc[0, 1])[-1])[0]: {
-            row[0]: row[1] for idx, row in datas.iloc[1:, :].iterrows()
+        "label":osp.splitext(osp.split(datas.iloc[0, 1])[-1])[0],  **{
+            row[0]: row[1] for idx, row in datas.iloc[2:, :].iterrows()
         }
     }
 
@@ -51,17 +51,19 @@ if __name__ == "__main__":
     print(f"suffix of prodigy file is {suffix}")
 
     prodigy_list = [
-        read_prodigy_txt(file)
+        read_prodigy_txt(osp.join(prodigy_output_filepath, file))
         for file in os.listdir(prodigy_output_filepath)
         if file.endswith(suffix)
     ]
-    prodigy_list.sort(
-        key=lambda x: list(x.values())[0][
-            "[++] Predicted binding affinity (kcal.mol-1)"
-        ],
-        reverse=True,
-    )
-
-    pd.concat([pd.DataFrame(each_prodigy).T for each_prodigy in prodigy_list]).to_csv(
-        output_csv
+    # prodigy_list.sort(
+    #     key=lambda x: list(x.values())[0][
+    #         "[++] Predicted binding affinity (kcal.mol-1)"
+    #     ],
+    #     reverse=True,
+    # )
+    # print(pd.DataFrame(prodigy_list[0]).T.columns)
+    print
+    out = pd.DataFrame(prodigy_list)
+    out.to_csv(
+        output_csv, index=False
     )
