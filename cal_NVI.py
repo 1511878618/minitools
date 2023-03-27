@@ -1,32 +1,40 @@
 #!/usr/bin/env python
-# -*-coding:utf-8 -*-
+# -*- coding: utf-8 -*-
+
 
 import argparse
-import os
-import os.path as osp
-import re
+from Bio import AlignIO
+import numpy as np
+import pandas as pd 
 
-import pandas as pd
+RNase_align = AlignIO.read("RNase.fas", format="fasta")
+SLF_align = AlignIO.read("SLF.fas", format="fasta")
+
+data = pd.DataFrame([list(str(i.seq)) for i in RNase_align])
 
 
-def read_prodigy_txt(path):
-    datas = pd.read_csv(path, sep=": ", header=None)
-    return {
-        "label":osp.splitext(osp.split(datas.iloc[0, 1])[-1])[0],  **{
-            row[0]: row[1] for idx, row in datas.iloc[2:, :].iterrows()
-        }
-    }
+def cal_NVI(col):
+    col_without_gap = col[col != "-"]
 
+    diff_aa_num = len(col_without_gap.unique())
+    max_aa_freq = max(col_without_gap.value_counts())
+    length_col = len(col_without_gap)
+
+    NVI = np.log(diff_aa_num / max_aa_freq) / np.log(length_col)
+    return NVI
+
+
+NVI_data = data.apply(cal_NVI, axis=0)
 
 def getParser():
     parser = argparse.ArgumentParser(
-        description=f"sort prodigy outputs folder and output a csv files. all prodigy output should be redirected to a suffix by --suffix"
+        description=f"cal NVI"
     )
 
     parser.add_argument(
         "-i",
         "--input",
-        dest="prodigy_output_filepath",
+        dest="dataPath",
         type=str,
         required=True,
         help="prodigy input folder",
