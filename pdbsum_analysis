@@ -190,10 +190,14 @@ def extract_protprot(
             # 更改chain名
             # chain_dcit = extract_chain_fasta(uniprot_dat_dir)
             # mapping_result = check_chain_seqname(single_data_dir, chain_dcit)
-
-            chain_A_name, chain_B_name = pdbsum_output_file_dir.split(":")
-            mapping_result = {"A": extract_file_name(chain_A_name), "B": chain_B_name}
-
+            if ":" in pdbsum_output_file_dir:
+                chain_A_name, chain_B_name = pdbsum_output_file_dir.split(":")
+                mapping_result = {"A": extract_file_name(chain_A_name), "B": chain_B_name}
+            elif "_" in pdbsum_output_file_dir:
+                chain_A_name, chain_B_name = pdbsum_output_file_dir.split("_")
+                mapping_result = {"A": extract_file_name(chain_A_name), "B": chain_B_name}
+            else:
+                mapping_result = {"A": "A", "B": "B"}
             print(mapping_result)
             prot_prot_df["chain_A_name"] = mapping_result["A"]
             prot_prot_df["chain_B_name"] = mapping_result["B"]
@@ -316,7 +320,7 @@ if __name__ == "__main__":
         for pdb_file in os.listdir(pdb_file_folder)
         if pdb_file.endswith(".pdb")
     ]
-
+    print(pdb_files)
     persudo_pdbcode_list = [
         [f"{PERMUTATIONS_LIST[idx][0]}{FOLDER}{PERMUTATIONS_LIST[idx][1]}", pdb_file]
         for idx, pdb_file in enumerate(pdb_files)
@@ -338,3 +342,5 @@ if __name__ == "__main__":
         # single_data_dir=single_data_dir,
         save_path=save_path,
     )
+
+
