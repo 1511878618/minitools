@@ -26,10 +26,10 @@ def getParser():
     )
 
     parser.add_argument(
-        "--col_left", dest="col_A", default=0, type=int, help="col_left start from 0 "
+        "--col_left", dest="col_A", default=0, help="col_left start from 0 "
     )
     parser.add_argument(
-        "--col_right", dest="col_B", default=0, type=int, help="col_right start from 0"
+        "--col_right", dest="col_B", default=0, help="col_right start from 0"
     )
 
     parser.add_argument(
@@ -111,8 +111,8 @@ if __name__ == "__main__":
     elif A is None and B is None:
         raise TypeError(f"-A or -B should be specific as at least one")
 
-    col_A = df_A.columns[args.col_A]
-    col_B = df_B.columns[args.col_B]
+    col_A = df_A.columns[args.col_A.split(",")]
+    col_B = df_B.columns[args.col_B.split(",")]
 
     df_B.rename({col_B: col_A}, axis=1, inplace=True)  # rename B -> A at col_B -> col_A
     col_B = col_A
