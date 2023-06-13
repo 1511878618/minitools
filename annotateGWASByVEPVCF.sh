@@ -136,14 +136,19 @@ echo "-v/--vcf: $vcf_file"
 echo "-c/--cutoff: $cutoff"
 
 # extract log10P = >8 >annotate_tmp.pos
-posFile=${output_prefix}.annotate_tmp.pos
-
+posFile=${output_prefix}.tmp.pos
+filterInputFile=${output_prefix}.filter
 if [[ "${input_file##*.}" == "gz" ]]; then
-    zcat ${input_file} | snpID2bed.py -i ${snp_col} --no-chr | awk -v cutoff=${cutoff} -v p_col=${pvalue_col} '{if($(p_col+5) > cutoff){print $1,$2}}' >${posFile}
+    zcat ${input_file} | snpID2bed.py -i ${snp_col} --no-chr | awk -v cutoff=${cutoff} -v p_col=${pvalue_col} 'NR==1{print;next}{if($(p_col+5) > cutoff){print}}' >${filterInputFile}
 
 else
-    cat ${input_file} | snpID2bed.py -i ${snp_col} --no-chr | awk -v cutoff=${cutoff} -v p_col=${pvalue_col} '{if($(p_col+5) > cutoff){print $1,$2}}' >${posFile}
+    cat ${input_file} | snpID2bed.py -i ${snp_col} --no-chr | awk -v cutoff=${cutoff} -v p_col=${pvalue_col} 'NR==1{print;next}{if($(p_col+5) > cutoff){print}}' >${filterInputFile}
 fi
+
+cat ${filterInputFile} | awk '{print $1,$2}' >${posFile}
+
+cat ${filterInputFile} | wcut -f6--1 >${filterInputFile}.tmp
+rm ${filterInputFile} && mv ${filterInputFile}.tmp ${filterInputFile}
 
 # vep extract => vcf file , this file will keep
 vcfExtract=${output_prefix}
@@ -155,13 +160,16 @@ else
 fi
 
 #vcf clean file: snpID, info
-vcfCleanFile=${output_prefix}.annotate_tmp.vcf
+vcfCleanFile=${output_prefix}.vep
 
 # 这个地方ParseVEPAnnotation4VCF专门解析VEP的VCF，如果是其他的要合并，这里需要修改
 # VEP 的前五列分别是：CHROM POS ID REF ALT => resetID.py => ID 变成：CHROM:POS:REF:ALT，进行后续匹配 => wcut -f 3,6--1 保留 ID(第三列)和ParseVEPAnnotation4VCF.py 生成的 INFO(第六列及之后)的结果，wcut可以换成awk的for循环
 cat ${vcfExtract}.recode.vcf | ParseVEPAnnotation4VCF.py | resetID.py -i 3 1 2 4 5 -c "#" | wcut -f 3,6--1 >${vcfCleanFile}
 
 #merge regenie with vcf exract file
-merge.py -l ${input_file} -r ${vcfCleanFile} -o "${snp_col};1" --how "right" >${output_prefix}.merge
-rm ${output_prefix}.annotate_tmp.*
+merge.py -l ${filterInputFile} -r ${vcfCleanFile} -o "${snp_col};1" --how "inner" >${output_prefix}.merge
+
+rm ${output_prefix}.tmp.*
 rm ${vcfExtract}.recode.vcf
+rm ${output_prefix}.log
+rm ${filterInputFile} ${vcfCleanFile}

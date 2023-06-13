@@ -171,36 +171,6 @@ compare_num() {
     awk -v LOG10P=$1 -v freq=$2 -v defaultLOG10P=${defaultLOG10P} -v defaultFREQ=${defaultFREQ} 'BEGIN{if(LOG10P<defaultLOG10P && freq < defaultFREQ){print "1"}else{print "0"}}'
 }
 
-# commsnp, pvalue < 1e-8
-
-# 比较大小
-
-# cat >&1 <<-EOF
-
-# 请使用: $(basename $0) <option>
-# example code  cond on given snp list
-# srun -J "cond_test" -c 40 --mem=40G ./$(basename $0) /pmaster/xutingfeng/dataset/ukb/dataset/snp/wgs/GRCh37/APOB apob step1 conditional/APOB/apob 20
-
-# parallel srun by below:
-# parallel -q echo "srun -J '{1}_{2}_conditional' -c {3} --mem=15G -o 'conditionalAnalysis/{1}/{2}/conditional.sbatch.out'  ./cond_qt.sh /pmaster/xutingfeng/dataset/ukb/dataset/snp/wgs/GRCh37/{1} {2} step1 conditionalAnalysis/{1}/{2} {3}" ::: APOB PCSK9 LDLR SORT1 ::: apob ldl_a ::: 20| parallel
-
-# parallel -q echo "sbatch -J '{1}_{2}_conditional' -c {3} --mem=15G -o ./log/%j_{1}_{2}.out --wrap './cond_qt.sh /pmaster/xutingfeng/dataset/ukb/dataset/snp/wgs/GRCh38/{1} {2} step1 conditionalAnalysis/GRCh38/{1}/{2} {3}'" ::: APOB PCSK9 LDLR SORT1 ::: ldl_a ::: 10| parall
-
-# Tree Structure:
-
-# ${outputPath}:
-#     step2/   # 直接运行
-#         *.regenie
-#         *.log
-#     cond1/  # cond on 1
-#         *.regenie
-#         *.log
-#         *.snplist
-#     cond2/  # cond on 2
-#     ....
-#     Total.snplist
-# EOF
-
 mkdir -p ${outputPath}
 
 # Step1 run regenie step2
@@ -226,9 +196,9 @@ regenie --step 2 \
 currentRegenieOutPut=${step2OutPutFile}/_${pheno}.regenie
 gzip ${currentRegenieOutPut}
 
-zcat ${currentRegenieOutPut}.gz | awk 'NR==1{print;next}{print | "sort -k12gr"}' | head | column -t | awk 'NR<=2 {print $3,$6,$12}' >>${outputPath}/total.leading
+zcat ${currentRegenieOutPut}.gz | awk 'NR==1{print;next}{print | "sort -k12gr"}' | head | column -t | awk 'NR<=2 {print $3,$6,$12}' >>${outputPath}/total.leading # => 提取全部信息 comming soon
 
-# 更新LOG10P和FREQ
+# 更新LOG10P和FREQ  => leading SNP freq >0.1 p < 1e-6 必须是；没有就停止
 LOG10P=$(tail -n 1 ${outputPath}/total.leading | awk '{print $3}')
 FREQ=$(tail -n 1 ${outputPath}/total.leading | awk '{print $2}')
 
@@ -236,11 +206,11 @@ FREQ=$(tail -n 1 ${outputPath}/total.leading | awk '{print $2}')
 if [ "$exclude_mode" = true ]; then
     excludeSNPList_current=${outputPath}/exclude.snplist
     echo "提取Step2的excludeSNPList(log10p < ${excludeLOG10PCUTOFF})到${excludeSNPList_current}"
-    zcat "${currentRegenieOutPut}".gz | awk -v excludeLOG10PCUTOFF="${excludeLOG10PCUTOFF}" 'NR==1{next}$12 <excludeLOG10PCUTOFF {print $3}' >>"${excludeSNPList_current}"
+    zcat "${currentRegenieOutPut}".gz | awk -v excludeLOG10PCUTOFF="${excludeLOG10PCUTOFF}" 'NR==1{next}$12 <excludeLOG10PCUTOFF {print $3}' >>"${excludeSNPList_current}" #  => 提取对应的最后一次所有的信息  comming soon
 fi
 
 count=1
-while [ $(compare_num ${LOG10P} ${FREQ}) -eq 0 ] && [ ${count} -le ${maxcount} ]; do
+while [ $(compare_num ${LOG10P} ${FREQ}) -eq 0 ] && [ ${count} -le ${maxcount} ]; do # => leading SNP freq >0.1 p < 1e-6 必须是；没有就停止
     # for ((i = 1; i <= ${condSNPNum}; i++)); do
     # Step2.1 提取上一步最显著的SNP以及对应的信息到Total.leading
 
@@ -301,7 +271,7 @@ while [ $(compare_num ${LOG10P} ${FREQ}) -eq 0 ] && [ ${count} -le ${maxcount} ]
 
     # 更新这一轮的leading SNP到total.leading
     zcat ${currentRegenieOutPut}.gz | awk 'NR==1{print;next}{print | "sort -k12gr"}' | head | column -t | awk 'NR==2 {print $3,$6,$12}' >>${outputPath}/total.leading
-    # 更新LOG10P和FREQ
+    # 更新LOG10P和FREQ => leading SNP freq >0.1 p < 1e-6 必须是；没有就停止
     LOG10P=$(tail -n 1 ${outputPath}/total.leading | awk '{print $3}')
     FREQ=$(tail -n 1 ${outputPath}/total.leading | awk '{print $2}')
 
