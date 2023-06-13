@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# example:
+# cat xxx.text | addHead.sh "head" ===> 添加head到第一行
+
+# 读取第一行数据并添加内容
+IFS= read -r first_line
+# new_first_line="${1}${first_line}"
+
+# 输出新的第一行数据
+echo -e "${1}" "$first_line"
+
+# 输出剩余的数据
+cat -

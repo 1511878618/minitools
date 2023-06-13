@@ -34,7 +34,7 @@ def getParser():
         "--on",
         dest="on_str",
         required=False,
-        help="like: 0,1;0,3  会把left的第1列和第二列作为合并的索引，右边的第一列和第四列作为合并的索引进行合并。1,2则会两边都拿第一列和第二列进行索引。如果不传入，则默认两个列表进行按行合并，此时how会影响严重影响后续的结果",
+        help="like: 1,2;1,34 会把left的第1列和第二列作为合并的索引，右边的第一列和第四列作为合并的索引进行合并。1,2则会两边都拿第一列和第二列进行索引。如果不传入，则默认两个列表进行按行合并，此时how会影响严重影响后续的结果",
     )
     # additional args
     parser.add_argument(
@@ -77,8 +77,8 @@ def parse_on_str(on_str):
     else:
         left_on_idx, right_on_idx = on_str_list
     # 格式化为int
-    left_on_idx = [int(i) for i in left_on_idx]
-    right_on_idx = [int(i) for i in right_on_idx]
+    left_on_idx = [int(i)-1 for i in left_on_idx]
+    right_on_idx = [int(i)-1 for i in right_on_idx]
 
     left_on = left.columns[left_on_idx].to_list()
     right_on = right.columns[right_on_idx].to_list()
@@ -125,10 +125,20 @@ if __name__ == "__main__":
                 output_sep = " "
         else:
             raise ValueError("输入存在两个sep且不同，--output_sep必须要指定")
-        
-    
-    left = pd.read_csv(args.left, sep=sep, header=header)
-    right = pd.read_csv(args.right, sep=sep, header=header)
+
+    leftPath=args.left
+    rightPath=args.right 
+
+    kwargs_left = {}
+    kwargs_right = {}
+
+    if leftPath.endswith(".gz"):
+        kwargs_left["compression"] = "gzip"
+    if rightPath.endswith(".gz"):
+        kwargs_right["compression"] = "gzip"
+
+    left = pd.read_csv(leftPath, sep=sep, header=header, **kwargs_left)
+    right = pd.read_csv(rightPath, sep=sep, header=header, **kwargs_right)
 
     if header is None:
         left.columns = [f"{i}_l" for i in range(len(left.columns))]
@@ -147,8 +157,8 @@ if __name__ == "__main__":
 
     # 奇怪的bug,
     if header is None:
-        merge_result.to_csv(sys.stdout, sep=output_sep, index=False, header=header)
+        merge_result.to_csv(sys.stdout, sep=output_sep, index=False, header=header, na_rep="NA")
     else:
         merge_result.to_csv(
-            sys.stdout, sep=output_sep, index=False, columns=merge_result.columns
+            sys.stdout, sep=output_sep, index=False, columns=merge_result.columns, na_rep="NA"
         )

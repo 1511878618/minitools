@@ -10,7 +10,6 @@ from signal import SIG_DFL, SIGPIPE, signal
 # need to change a lot !
 
 
-
 warnings.filterwarnings("ignore")
 signal(
     SIGPIPE, SIG_DFL
@@ -21,11 +20,13 @@ def getParser():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description=textwrap.dedent(
-        """
-        Set/Replace ID for any file. setID as : chr:pos:ref:alt
+            """
+        %prog Set/Replace ID for any file. setID as : chr:pos:ref:alt
         @Author: wavefancy@gmail.com (raw code comes from) and xutingfeng@big.ac.cn (modified for this version)
 
         Version: 1.0
+
+        --header的时候，它会默认忽略第一行，直接输出；而使用--comment的时候，直接输出所有以comment开头的所有行；二者不可以同时使用。
 
         Example
         1. Reset bim file by code: `cat test.bim| resetID.py -i 2 1 4 6 5 `
@@ -57,38 +58,89 @@ def getParser():
             19      10091633        19:10091633:G:A G       A
             19      10091645        19:10091645:C:T C       T
         """
-        )
+        ),
     )
 
-    parser.add_argument("-i", "--col_oreder", dest="col_order", default=[],nargs="+",help="default is -i 3 1 2 4 5 . -i 2 1 4 5 6 => ID col is 2, chr col is 1, pos col is 4, ref col is 5, alt col is 6. Note col index start from 1.", type=str)
-    parser.add_argument("-k","--keep", dest="keep", required=False,action="store_true", help="Include old rsID.")
-    parser.add_argument("-s","--sort", dest="sort", required=False,action="store_true", help="ort the ref and alt alleles, sorted([ref,alt])")
-    parser.add_argument("-d", "--delimter", dest="delimter", default=None,help="delimter for input file, default is 'any white sapce'.")
-    parser.add_argument("--comment", dest="comment", default=None,help="comment char, default is '#'.", type=str)
+    parser.add_argument(
+        "-i",
+        "--col_oreder",
+        dest="col_order",
+        default=[],
+        nargs="+",
+        help="default is -i 3 1 2 4 5 . -i 2 1 4 5 6 => ID col is 2, chr col is 1, pos col is 4, ref col is 5, alt col is 6. Note col index start from 1.",
+        type=str,
+    )
+    parser.add_argument(
+        "-k",
+        "--keep",
+        dest="keep",
+        required=False,
+        action="store_true",
+        help="Include old rsID.",
+    )
+    parser.add_argument(
+        "-s",
+        "--sort",
+        dest="sort",
+        required=False,
+        action="store_true",
+        help="ort the ref and alt alleles, sorted([ref,alt])",
+    )
+    parser.add_argument(
+        "-d",
+        "--delimter",
+        dest="delimter",
+        default=None,
+        help="delimter for input file, default is 'any white sapce'.",
+    )
+    parser.add_argument(
+        "-c",
+        "--comment",
+        dest="comment",
+        default=None,
+        help="comment char, default is '#'.",
+    )
+    parser.add_argument(
+        "--header",
+        dest="header",
+        action="store_true",
+        help="Set this if input file with header.",
+    )
     return parser
 
-def resetID(line, orderList, IncludeOld = False, is_sort = False, delimter = None):
+
+def resetID(line, orderList, IncludeOld=False, is_sort=False, delimter=None):
     """
     reset ID for any file.
     setID as : chr:pos:ref:alt
-    return 
+    return
     """
-    #output results.
+    # output results.
     ss = line.split(delimter)
-    idCol,chrCol,posCol,refCol,altCol = orderList
+    idCol, chrCol, posCol, refCol, altCol = orderList
     # check if need to sort ref, alt alleles.
     stemp = sorted([ss[refCol], ss[altCol]]) if is_sort else [ss[refCol], ss[altCol]]
 
     if IncludeOld:
-        ss[idCol] = ss[chrCol] + ':' + ss[posCol] + ':' + stemp[0] + ':' + stemp[1] + ':' + ss[idCol]
+        ss[idCol] = (
+            ss[chrCol]
+            + ":"
+            + ss[posCol]
+            + ":"
+            + stemp[0]
+            + ":"
+            + stemp[1]
+            + ":"
+            + ss[idCol]
+        )
     else:
-        ss[idCol] = ss[chrCol] + ':' + ss[posCol] + ':' + stemp[0] + ':' + stemp[1]
+        ss[idCol] = ss[chrCol] + ":" + ss[posCol] + ":" + stemp[0] + ":" + stemp[1]
     if delimter is None:
-        outputDelimter = '\t'
+        outputDelimter = "\t"
     else:
         outputDelimter = delimter
-    return '%s\n'%(outputDelimter.join(ss))
-    #sys.stdout.write('%s\n'%('\t'.join([ss[x] for x in idIndex])))
+    return "%s\n" % (outputDelimter.join(ss))
+    # sys.stdout.write('%s\n'%('\t'.join([ss[x] for x in idIndex])))
 
 
 if __name__ == "__main__":
@@ -97,28 +149,56 @@ if __name__ == "__main__":
 
     expr = args.col_order
     if expr == []:
-        expr = [3,1,2,4,5]
+        expr = [3, 1, 2, 4, 5]
     IncludeOld = args.keep
     is_sort = args.sort
     comment = args.comment
     delimter = args.delimter
+    header = args.header
+
+    # check header and comments
+    if comment is not None and header:
+        raise ValueError(
+            "Error: --header and --comment can not be set at the same time；推荐--header的时候，它会默认忽略第一行，直接输出；而使用--comment的时候，直接输出所有以#开头的"
+        )
+    if header:
+        skip_row = 1
+    else:
+        skip_row = 0
+
     # print(comment,delimter, sort, IncludeOld)
-    orderList = [int(i)-1 for i in expr]
+    orderList = [int(i) - 1 for i in expr]
     # print(idCol,chrCol,posCol,refCol,altCol)
     output = False
     for line in sys.stdin:
+        if skip_row > 0:
+            skip_row -= 1
+            continue
+
         line = line.strip()
         if line:
             if output:
-                ss = resetID(line=line, orderList=orderList, IncludeOld=IncludeOld, is_sort=is_sort, delimter=delimter)
+                ss = resetID(
+                    line=line,
+                    orderList=orderList,
+                    IncludeOld=IncludeOld,
+                    is_sort=is_sort,
+                    delimter=delimter,
+                )
                 sys.stdout.write(ss)
 
             else:
-                if line.startswith(comment):
-                    sys.stdout.write('%s\n'%(line))
+                if comment is not None and line.startswith(comment):
+                    sys.stdout.write("%s\n" % (line))
                 else:
                     output = True
-                    ss = resetID(line=line, orderList=orderList, IncludeOld=IncludeOld, is_sort=is_sort, delimter=delimter)
+                    ss = resetID(
+                        line=line,
+                        orderList=orderList,
+                        IncludeOld=IncludeOld,
+                        is_sort=is_sort,
+                        delimter=delimter,
+                    )
                     sys.stdout.write(ss)
 
 
