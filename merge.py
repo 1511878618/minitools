@@ -129,8 +129,8 @@ if __name__ == "__main__":
     leftPath=args.left
     rightPath=args.right 
 
-    kwargs_left = {}
-    kwargs_right = {}
+    kwargs_left = {"dtype":str}
+    kwargs_right = {"dtype":str}
 
     if leftPath.endswith(".gz"):
         kwargs_left["compression"] = "gzip"

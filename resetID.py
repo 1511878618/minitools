@@ -57,6 +57,20 @@ def getParser():
             #CHROM  POS     ID      REF     ALT
             19      10091633        19:10091633:G:A G       A
             19      10091645        19:10091645:C:T C       T
+
+        3. if only resort ID column, use `zcat ldl_a.table.gz|body resetID.py -i 3 -s `
+            -i 3 指定ID列，不用指定其他的列了
+            可以支持的操作有：
+            -s 代表对ref和alt进行排序，这样就不用考虑ref和alt的顺序了
+            --add-chr 对chr列加上chr前缀
+            --keep 保留原始ID
+            --header 有header的时候，它会默认忽略第一行，直接输出；而使用--comment的时候，直接输出所有以comment开头的所有行；二者不可以同时使用。
+            Assume IDCol should be: chr:pos:ref:alt
+        
+        
+
+
+
         """
         ),
     )
@@ -67,7 +81,7 @@ def getParser():
         dest="col_order",
         default=[],
         nargs="+",
-        help="default is -i 3 1 2 4 5 . -i 2 1 4 5 6 => ID col is 2, chr col is 1, pos col is 4, ref col is 5, alt col is 6. Note col index start from 1.",
+        help="default is -i 3 1 2 4 5 . -i 2 1 4 5 6 => ID col is 2, chr col is 1, pos col is 4, ref col is 5, alt col is 6. Note col index start from 1.如果已经是这个格式了则可以直接 -i 3， 然后进行下面的操作",
         type=str,
     )
     parser.add_argument(
@@ -100,6 +114,7 @@ def getParser():
         default=None,
         help="comment char, default is '#'.",
     )
+    parser.add_argument("--add-chr", dest="addChr", action="store_true", help="add chr for chr col of ID")
     parser.add_argument(
         "--header",
         dest="header",
@@ -108,8 +123,26 @@ def getParser():
     )
     return parser
 
+def formatChr(x):
+    if x.startswith("chr"):
+        return x
+    elif x.isdigit():
+        if int(x) < 23:
+            return "chr" + str(int(x))
+        else:
+            if x == "23":
+                return "chrX"
+            elif x == "24":
+                return "chrY"
+            elif x == "25":
+                return "chrX"
+            elif x == "26":
+                return "chrMT"
+    else:
+        return x
+    
 
-def resetID(line, orderList, IncludeOld=False, is_sort=False, delimter=None):
+def resetID(line, orderList, IncludeOld=False, is_sort=False, delimter=None,addChr=False):
     """
     reset ID for any file.
     setID as : chr:pos:ref:alt
@@ -117,29 +150,36 @@ def resetID(line, orderList, IncludeOld=False, is_sort=False, delimter=None):
     """
     # output results.
     ss = line.split(delimter)
-    idCol, chrCol, posCol, refCol, altCol = orderList
-    # check if need to sort ref, alt alleles.
-    stemp = sorted([ss[refCol], ss[altCol]]) if is_sort else [ss[refCol], ss[altCol]]
-
-    if IncludeOld:
-        ss[idCol] = (
-            ss[chrCol]
-            + ":"
-            + ss[posCol]
-            + ":"
-            + stemp[0]
-            + ":"
-            + stemp[1]
-            + ":"
-            + ss[idCol]
-        )
+    
+    # orderList should contain at least one element, which is ID col
+    if len(orderList) ==1:
+        idCol = orderList[0]
+        oldID = ss[idCol]
+        chr, pos, A0, A1 = oldID.split(':') # this time A0 and A1 is not sure, and this mode should work for --sort or --add-chr or do nothing 
     else:
-        ss[idCol] = ss[chrCol] + ":" + ss[posCol] + ":" + stemp[0] + ":" + stemp[1]
+        idCol, chrCol, posCol, refCol, altCol = orderList
+
+        oldID, chr, pos, A0, A1 = ss[idCol], ss[chrCol], ss[posCol], ss[refCol], ss[altCol] # this time A0 is REF and A1 is ALT; this work for rename ID 
+    
+    if is_sort:
+        stemp = sorted([A0, A1])
+    else:
+        stemp = [A0, A1]
+
+    if addChr:
+        chr = formatChr(chr)
+
+    newID = chr + ':' + pos + ':' + stemp[0] + ':' + stemp[1]
+    if IncludeOld:  # 是否包含oldID
+        newID = newID + ':' + oldID  
+    # 更新到ss中
+    ss[idCol] = newID
+
     if delimter is None:
         outputDelimter = "\t"
     else:
         outputDelimter = delimter
-    return "%s\n" % (outputDelimter.join(ss))
+    return outputDelimter.join(ss)
     # sys.stdout.write('%s\n'%('\t'.join([ss[x] for x in idIndex])))
 
 
@@ -155,6 +195,7 @@ if __name__ == "__main__":
     comment = args.comment
     delimter = args.delimter
     header = args.header
+    addChr = args.addChr
 
     # check header and comments
     if comment is not None and header:
@@ -166,9 +207,7 @@ if __name__ == "__main__":
     else:
         skip_row = 0
 
-    # print(comment,delimter, sort, IncludeOld)
     orderList = [int(i) - 1 for i in expr]
-    # print(idCol,chrCol,posCol,refCol,altCol)
     output = False
     for line in sys.stdin:
         if skip_row > 0:
@@ -184,12 +223,13 @@ if __name__ == "__main__":
                     IncludeOld=IncludeOld,
                     is_sort=is_sort,
                     delimter=delimter,
+                    addChr=addChr,
                 )
-                sys.stdout.write(ss)
+                sys.stdout.write(f"{ss}\n")
 
             else:
                 if comment is not None and line.startswith(comment):
-                    sys.stdout.write("%s\n" % (line))
+                    sys.stdout.write(f"{line}\n")
                 else:
                     output = True
                     ss = resetID(
@@ -198,8 +238,9 @@ if __name__ == "__main__":
                         IncludeOld=IncludeOld,
                         is_sort=is_sort,
                         delimter=delimter,
+                        addChr=addChr,
                     )
-                    sys.stdout.write(ss)
+                    sys.stdout.write(f"{ss}\n")
 
 
 sys.stdout.close()
