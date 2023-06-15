@@ -53,9 +53,11 @@ EOF
 cutoff=8
 
 # 定义必需的参数列表
-required_params=("input_file" "snp_col" "pvalue_col" "output_prefix" "vcf_file")
+required_params=("input_file" "snp_col" "output_prefix" "vcf_file")
 
 # 解析命令行参数
+echo "$(basename "$0")"
+
 while [[ $# -gt 0 ]]; do
     key="$1"
 
@@ -66,16 +68,26 @@ while [[ $# -gt 0 ]]; do
             exit 1
         fi
         input_file="$2"
+        echo "$1 $2"
         shift 2
         ;;
     -C | --col)
-        if [[ $# -lt 3 ]]; then
-            echo "错误: --col 参数需要提供两个参数值" >&2
+
+        if [[ -z "$2" || "$2" == -* ]]; then
+            echo "错误: --col 参数至少需要一个值" >&2
             exit 1
         fi
         snp_col="$2"
-        pvalue_col="$3"
-        shift 3
+
+        if [[ -z "$3" || "$3" == -* ]]; then
+            echo "$1 $2"
+
+            shift 2
+        else
+            echo "$1 $2 $3"
+            pvalue_col="$3"
+            sfhit 3
+        fi
         ;;
     -o | --out)
         if [[ -z "$2" || "$2" == -* ]]; then
@@ -83,6 +95,7 @@ while [[ $# -gt 0 ]]; do
             exit 1
         fi
         output_prefix="$2"
+        echo "$1 $2"
         shift 2
         ;;
     -v | --vcf)
@@ -91,6 +104,7 @@ while [[ $# -gt 0 ]]; do
             exit 1
         fi
         vcf_file="$2"
+        echo "$1 $2"
         shift 2
         ;;
     -c | --cutoff)
@@ -99,6 +113,7 @@ while [[ $# -gt 0 ]]; do
             exit 1
         fi
         cutoff="$2"
+        echo "$1 $2"
         shift 2
         ;;
     -h | --help)
@@ -128,12 +143,11 @@ if [ ${#missing_params[@]} -gt 0 ]; then
 fi
 
 # 打印解析后的参数值
-echo "$(basename "$0")"
-echo "-i/--input: $input_file"
-echo "-C/--col: $snp_col $pvalue_col"
-echo "-o/--out: $output_prefix"
-echo "-v/--vcf: $vcf_file"
-echo "-c/--cutoff: $cutoff"
+# echo "-i/--input: $input_file"
+# echo "-C/--col: $snp_col $pvalue_col"
+# echo "-o/--out: $output_prefix"
+# echo "-v/--vcf: $vcf_file"
+# echo "-c/--cutoff: $cutoff"
 
 # extract log10P = >8 >annotate_tmp.pos
 posFile=${output_prefix}.tmp.pos

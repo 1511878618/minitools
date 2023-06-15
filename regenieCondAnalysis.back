@@ -52,7 +52,7 @@ defaultFREQ=1e-2
 regenie_mode="--qt"
 # 定义必需的参数列表
 required_params=("pgenPath" "phenoFile" "pheno" "predFile")
-set -e
+
 # 解析命令行参数
 while [[ $# -gt 0 ]]; do
     key="$1"
@@ -167,7 +167,7 @@ while [[ $# -gt 0 ]]; do
         ;;
     esac
 done
-# set -e
+set -e
 # 检查必需的参数是否提供
 missing_params=()
 for param in "${required_params[@]}"; do
@@ -199,140 +199,172 @@ if [ "$exclude_mode" = true ]; then
     echo "exclude-mode 参数值: $exclude_mode"
     echo "exclude-mode 参数值: $excludeLOG10PCUTOFF"
     echo "每一步得到的结果中LOG10P小于${excludeLOG10PCUTOFF}的SNP会被提出来作为下一步的排除"
-    excludeSNPFile=${outputPath}/exclude.regenie
-
 fi
 
+compare_num() {
+    awk -v LOG10P=$1 -v freq=$2 -v defaultLOG10P=${defaultLOG10P} -v defaultFREQ=${defaultFREQ} 'BEGIN{if(LOG10P<defaultLOG10P && freq < defaultFREQ){print "1"}else{print "0"}}'
+}
+
+echo "-------------BEGIN OF STEP2 -------------"
 mkdir -p ${outputPath}
-leadingFile=${outputPath}/leading.regenie
-for ((count = 0; count <= ${maxcount}; count++)); do
-    # while [[ -n "${LOG10P}" && -n "${FREQ}" ]] && [ ${count} -le ${maxcount} ]; do
-    # run regenie
-    echo "-------------BEGIN OF epoch :${count} -------------"
 
-    if [[ "${count}" -eq 0 ]]; then
-        # Step1 run regenie step2
-        currentDir=${outputPath}/step2
-        mkdir -p ${currentDir}
+# Step1 run regenie step2
+step2OutPutFile=${outputPath}/step2
+mkdir -p ${step2OutPutFile}
 
+regenie --step 2 \
+    --threads=${threads} \
+    --ref-first \
+    --pgen ${pgenPath} \
+    --phenoFile ${phenoFile} \
+    --phenoCol ${pheno} \
+    ${regenie_mode} \
+    --covarFile /pmaster/xutingfeng/dataset/ukb/phenotype/regenie.cov \
+    --covarColList genotype_array,inferred_sex,age_visit,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,assessment_center,age_squared \
+    --catCovarList genotype_array,inferred_sex,assessment_center \
+    --maxCatLevels 30 \
+    --bsize 1000 \
+    --out ${step2OutPutFile}/ \
+    --minMAC 1 \
+    --pred ${predFile}
+# >/dev/null
+
+currentRegenieOutPut=${step2OutPutFile}/_${pheno}.regenie
+echo ${currentRegenieOutPut}
+gzip ${currentRegenieOutPut}
+
+# $3 regenie ID; $6 regenie freq; $12 regenie log10p
+# add head
+zcat "${currentRegenieOutPut}".gz | awk 'NR==1{print;exit}' >${outputPath}/total.leading
+# filter by freq and log10p
+read currentSNP FREQ LOG10P <<<"$(zcat ${currentRegenieOutPut}.gz | awk 'NR>=2{print | "sort -k12gr"}' | awk -v freqCUTOFF=${defaultFREQ} -v LOG10PCUTOFF=${defaultLOG10P} '{if ($6 > freqCUTOFF && $12 >LOG10PCUTOFF){print;exit}}' | tee -a ${outputPath}/total.leading | awk 'BEGIN{OFS=" "}{print $3, $6, $12}')"
+
+echo "${currentSNP} ${FREQ} ${LOG10P}"
+if [[ -z ${LOG10P} && -z ${FREQ} ]]; then
+    echo "No SNP passed the filter!!!!!"
+    exit 1
+fi
+# # 写入total.snplist
+# cat ${outputPath}/total.leading | awk 'NR==1{next}NR==2{print $3}' >${outputPath}/total.snplist
+
+echo -e "epoch\tID\tFREQ\tLOG10P\nstep2\t${currentSNP}\t${FREQ}\t${LOG10P}" | column -t
+
+echo "-------------END OF STEP2 -------------"
+#设定排除的文件
+if [[ "$exclude_mode" = true ]]; then
+    excludeSNP_current=${outputPath}/exclude.leading
+    excludeSNPList_current=${outputPath}/exclude.snplist
+fi
+
+count=1
+while [[ -n "${LOG10P}" && -n "${FREQ}" ]] && [ ${count} -le $((${maxcount} + 1)) ]; do
+    echo "-------------BEGIN OF COND_${count} -------------"
+    # for ((i = 1; i <= ${condSNPNum}; i++)); do
+    if [[ "$exclude_mode" = true ]]; then
+        if [[ "${count}" -eq 1 ]]; then
+            echo "提取Step2的excludeSNPList(log10p < ${excludeLOG10PCUTOFF})到${excludeSNPList_current}"
+            zcat "${currentRegenieOutPut}".gz | awk -v excludeLOG10PCUTOFF="${excludeLOG10PCUTOFF}" 'NR==1{print $0, "FAILDTIME";next}$12 <excludeLOG10PCUTOFF {print $0, "0"}' | tee "${excludeSNP_current}" | awk 'NR==1{next}{print $3}' >>${excludeSNPList_current} # 提取对应的最后一次所有的信息，最后一列为FAILDTIME；说明是在那一次被过滤掉的。
+        else
+            # 如果exclude_mode open 则提取当前的excludeSNPList
+            zcat "${currentRegenieOutPut}".gz | awk -v excludeLOG10PCUTOFF="${excludeLOG10PCUTOFF}" -v currentCount=${count} 'NR==1{next}$12 <excludeLOG10PCUTOFF {print $0, currentCount}' | tee -a "${excludeSNP_current}" | awk 'NR==1{next}{print $3}' >>${excludeSNPList_current} # 提取对应的最后一次所有的信息
+        fi
+    fi
+
+    # Step2.1 提取上一步最显著的SNP以及对应的信息到Total.leading
+    currentCondDir=${outputPath}/cond${count}
+    mkdir -p ${currentCondDir}
+    # 提取当前的leading SNP到目录下
+    cp ${outputPath}/total.leading ${currentCondDir}/cond.leading
+    # 获取当前cond的snplist;跳过header
+    tail -n +2 ${currentCondDir}/cond.leading | awk '{print $3}' >${currentCondDir}/cond.snplist
+
+    # 如果exclude_mode open 则提取当前的excludeSNPList
+    if [ "$exclude_mode" = true ]; then
+        cp ${excludeSNPList_current} ${currentCondDir}/exclude.snplist
+        echo "exclude $(cat ${currentCondDir}/exclude.snplist | wc -l) SNPs in ${count} conditionalAnalysis"
+
+        # Step2.2 conditional analysis
+        # echo "running ${count} ........"
         regenie --step 2 \
             --threads=${threads} \
             --ref-first \
             --pgen ${pgenPath} \
             --phenoFile ${phenoFile} \
             --phenoCol ${pheno} \
+            --condition-list ${currentCondDir}/cond.snplist \
+            --exclude ${currentCondDir}/exclude.snplist \
             ${regenie_mode} \
             --covarFile /pmaster/xutingfeng/dataset/ukb/phenotype/regenie.cov \
             --covarColList genotype_array,inferred_sex,age_visit,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,assessment_center,age_squared \
             --catCovarList genotype_array,inferred_sex,assessment_center \
             --maxCatLevels 30 \
             --bsize 1000 \
-            --out ${currentDir}/ \
+            --out ${currentCondDir}/ \
             --minMAC 1 \
             --pred ${predFile} \
             >/dev/null
 
     else
-        currentDir=${outputPath}/cond_${count}
-        mkdir -p ${currentDir}
-        currentCondList=${currentDir}/cond.snplist
-        tail -n +2 ${leadingFile} | awk '{print $3}' >${currentCondList}
-
-        if [ "$exclude_mode" = true ]; then
-            # 提取当前需要用到的excludeSNPList
-            excludeSNPListCurrent=${currentDir}/exclude.snplist
-            tail -n +2 ${excludeSNPFile} | awk '{print $3}' >${excludeSNPListCurrent}
-
-            echo "exclude $(cat ${excludeSNPListCurrent} | wc -l) SNPs in ${count} conditionalAnalysis"
-
-            # Step2.2 conditional analysis
-            # echo "running ${count} ........"
-            regenie --step 2 \
-                --threads=${threads} \
-                --ref-first \
-                --pgen ${pgenPath} \
-                --phenoFile ${phenoFile} \
-                --phenoCol ${pheno} \
-                --condition-list ${currentCondList} \
-                --exclude ${excludeSNPListCurrent} \
-                ${regenie_mode} \
-                --covarFile /pmaster/xutingfeng/dataset/ukb/phenotype/regenie.cov \
-                --covarColList genotype_array,inferred_sex,age_visit,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,assessment_center,age_squared \
-                --catCovarList genotype_array,inferred_sex,assessment_center \
-                --maxCatLevels 30 \
-                --bsize 1000 \
-                --out ${currentDir}/ \
-                --minMAC 1 \
-                --pred ${predFile} \
-                >/dev/null
-
-        else
-            # Step2.2 conditional analysis
-            # echo "running ${count} ........"
-            regenie --step 2 \
-                --threads=${threads} \
-                --ref-first \
-                --pgen ${pgenPath} \
-                --phenoFile ${phenoFile} \
-                --phenoCol ${pheno} \
-                --condition-list ${currentCondList} \
-                ${regenie_mode} \
-                --covarFile /pmaster/xutingfeng/dataset/ukb/phenotype/regenie.cov \
-                --covarColList genotype_array,inferred_sex,age_visit,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,assessment_center,age_squared \
-                --catCovarList genotype_array,inferred_sex,assessment_center \
-                --maxCatLevels 30 \
-                --bsize 1000 \
-                --out ${currentDir}/ \
-                --minMAC 1 \
-                --pred ${predFile} \
-                >/dev/null
-
-        fi
+        # Step2.2 conditional analysis
+        # echo "running ${count} ........"
+        regenie --step 2 \
+            --threads=${threads} \
+            --ref-first \
+            --pgen ${pgenPath} \
+            --phenoFile ${phenoFile} \
+            --phenoCol ${pheno} \
+            --condition-list ${currentCondDir}/cond.snplist \
+            ${regenie_mode} \
+            --covarFile /pmaster/xutingfeng/dataset/ukb/phenotype/regenie.cov \
+            --covarColList genotype_array,inferred_sex,age_visit,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,assessment_center,age_squared \
+            --catCovarList genotype_array,inferred_sex,assessment_center \
+            --maxCatLevels 30 \
+            --bsize 1000 \
+            --out ${currentCondDir}/ \
+            --minMAC 1 \
+            --pred ${predFile} \
+            >/dev/null
 
     fi
-    # 对输出处理
-    currentRegenieOutPut=${currentDir}/_${pheno}.regenie
+
+    currentRegenieOutPut=${currentCondDir}/_${pheno}.regenie
     gzip ${currentRegenieOutPut}
-    # 写入header
 
-    if [[ "${count}" -eq 0 ]]; then # 写入header
-        read currentSNP FREQ LOG10P <<<"$(zcat ${currentRegenieOutPut}.gz | awk 'NR==1{print;next}NR>=2{print | "sort -k12gr"}' | awk -v freqCUTOFF=${defaultFREQ} -v LOG10PCUTOFF=${defaultLOG10P} 'NR==1{print;next}{if ($6 > freqCUTOFF && $12 >LOG10PCUTOFF){print;exit}}' | tee ${leadingFile} | awk 'BEGIN{OFS=" "}{print $3, $6, $12}')"
-    else # 不写入header
-        read currentSNP FREQ LOG10P <<<"$(zcat ${currentRegenieOutPut}.gz | awk 'NR>=2{print | "sort -k12gr"}' | awk -v freqCUTOFF=${defaultFREQ} -v LOG10PCUTOFF=${defaultLOG10P} '{if ($6 > freqCUTOFF && $12 >LOG10PCUTOFF){print;exit}}' | tee -a ${leadingFile} | awk 'BEGIN{OFS=" "}{print $3, $6, $12}')"
-    fi
-    # 提取排除 的SNP
-    if [[ "$exclude_mode" = true ]]; then
-        if [[ "${count}" -eq 0 ]]; then
-            zcat "${currentRegenieOutPut}".gz | awk -v excludeLOG10PCUTOFF="${excludeLOG10PCUTOFF}" 'NR==1{print $0, "FAILDTIME";next}$12 <excludeLOG10PCUTOFF {print $0, "0"}' >${excludeSNPFile} # 提取对应的最后一次所有的信息，最后一列为FAILDTIME；说明是在那一次被过滤掉的。
-        else
-            # 如果exclude_mode open 则提取当前的excludeSNPList
-            zcat "${currentRegenieOutPut}".gz | awk -v excludeLOG10PCUTOFF="${excludeLOG10PCUTOFF}" -v currentCount=${count} 'NR==1{next}$12 <excludeLOG10PCUTOFF {print $0, currentCount}' >>"${excludeSNPFile}" # 提取对应的最后一次所有的信息
-        fi
-    fi
+    # 更新这一轮的leading SNP到total.leading
+    read currentSNP FREQ LOG10P <<<"$(zcat ${currentRegenieOutPut}.gz | awk 'NR>=2{print | "sort -k12gr"}' | awk -v freqCUTOFF=${defaultFREQ} -v LOG10PCUTOFF=${defaultLOG10P} '{if ($6 > freqCUTOFF && $12 >LOG10PCUTOFF){print;exit}}' | tee -a ${outputPath}/total.leading | awk 'BEGIN{OFS=" "}{print $3, $6, $12}')"
+
     # 更新计数器
     if [[ -n "${LOG10P}" && -n "${FREQ}" ]]; then
-        echo -e "epoch\tID\tFREQ\tLOG10P\ncond_${count}\t${currentSNP}\t${FREQ}\t${LOG10P}" | column -t
-    else
-        echo "No SNP passed the filter at epoch ${count}!!!!!"
-        break
-    fi
-    echo "-------------END OF epoch:${count}  -------------"
-done
-leadingSNPList=${outputPath}/leading.snplist
-tail -n +2 ${leadingFile} | awk '{print $3}' >${leadingSNPList}
 
-finalFile=${outputPath}/${pheno}.cond.regeine
+        echo -e "epoch\tID\tFREQ\tLOG10P\ncond_${count}\t${currentSNP}\t${FREQ}\t${LOG10P}" | column -t
+        count=$((${count} + 1))
+    fi
+    echo "-------------END OF COND_${count} -------------"
+done
+
+tail -n +2 ${outputPath}/total.leading | awk '{print $3}' >${outputPath}/total.snplist
+
 # 如果exclude_mode open 则提取当前的excludeSNPList
 if [ "$exclude_mode" = true ]; then
     # excludeSNPList_current=${outputPath}/exclude.snplist
-    finalKeepFile=${outputPath}/keep.regenie
+    echo "提取cond_${count}，也是最后一次的excludeSNPList(log10p < ${excludeLOG10PCUTOFF})到${excludeSNPList_current}"
+    zcat "${currentRegenieOutPut}".gz | awk -v excludeLOG10PCUTOFF="${excludeLOG10PCUTOFF}" -v currentCount=${count} 'NR==1{next}$12 <excludeLOG10PCUTOFF {print $0, currentCount}' | tee -a "${excludeSNP_current}" | awk 'NR==1{next}{print $3}' >>${excludeSNPList_current} # 提取对应的最后一次所有的信息
 
-    zcat "${currentRegenieOutPut}".gz | awk -v excludeLOG10PCUTOFF="${excludeLOG10PCUTOFF}" -v currentCount=${count} 'NR==1{print;next}$12 >=excludeLOG10PCUTOFF {print $0, "keep"}' >${finalKeepFile}
-    # merge all
-    cat ${leadingFile} <(tail -n +2 ${finalKeepFile}) <(tail -n +2 ${excludeSNPFile}) >${finalFile}
-
-else
-    cat ${leadingFile} <(zcat "${currentRegenieOutPut}".gz | awk 'NR>=2{print $0, "keep"}') >${finalFile}
 fi
+
+# 合并最终的输出结果
+## tmp_cond_final
+tmp_cond_final=${outputPath}/tmp_cond_final.txt
+tmp_leading=${outputPath}/tmp_leading.txt
+zcat ${currentRegenieOutPut}.gz | awk 'NR>=2{print $0, "keep"}' >${tmp_cond_final}
+cat ${outputPath}/total.leading | awk 'NR>=2{print $0, "leading"}' >${tmp_leading}
+
+if [ "$exclude_mode" = true ]; then
+    cat ${outputPath}/exclude.leading ${tmp_leading} ${tmp_cond_final} | awk 'NR==1{print;next}{print | "sort -k12gr"}' >${outputPath}/final.leading
+else
+    cat ${tmp_leading} ${tmp_cond_final} | awk 'NR==1{print;next}{print | "sort -k12gr"}' >${outputPath}/final.leading
+fi
+
+rm ${tmp_cond_final} ${tmp_leading}
 
 echo "Finished!"
