@@ -16,7 +16,7 @@ usage() {
     -C, --col <snpCol> <pvalueCol>    SNP ID 列和 [pvalue|-log10P] 列，格式如：1 2
     -o, --out <out>    输出前缀
     -v, --vcf <vcf>    VCF 文件；[vcf|vcf.gz]；目前只适合于VEP注释的VCF文件
-    -c, --cutoff <cutoff>    阈值；默认值为LOG10P为 8；请谨慎选择，确保数据是 -log10P 还是 P；用于对input file 进行过滤
+    -c, --cutoff <cutoff>    阈值；默认值为LOG10P为 0；请谨慎选择，确保数据是 -log10P 还是 P；用于对input file 进行过滤
 
 示例:
     $(basename "$0") -i <input_file> -C <snpCol> <pvalueCol> -o <output_prefix> -v <vcf_file> -c <cutoff>
@@ -50,7 +50,7 @@ EOF
     exit 2
 }
 # 默认参数值
-cutoff=8
+cutoff=0
 
 # 定义必需的参数列表
 required_params=("input_file" "snp_col" "output_prefix" "vcf_file")
@@ -152,13 +152,23 @@ fi
 # extract log10P = >8 >annotate_tmp.pos
 posFile=${output_prefix}.tmp.pos
 filterInputFile=${output_prefix}.filter
-if [[ "${input_file##*.}" == "gz" ]]; then
-    zcat ${input_file} | snpID2bed.py -i ${snp_col} --no-chr | awk -v cutoff=${cutoff} -v p_col=${pvalue_col} 'NR==1{print;next}{if($(p_col+5) > cutoff){print}}' >${filterInputFile}
+
+if [[ ${cutoff} -eq 0 ]]; then
+    if [[ "${input_file##*.}" == "gz" ]]; then
+        zcat ${input_file} | snpID2bed.py -i ${snp_col} --no-chr >${filterInputFile}
+
+    else
+        cat ${input_file} | snpID2bed.py -i ${snp_col} --no-chr >${filterInputFile}
+    fi
 
 else
-    cat ${input_file} | snpID2bed.py -i ${snp_col} --no-chr | awk -v cutoff=${cutoff} -v p_col=${pvalue_col} 'NR==1{print;next}{if($(p_col+5) > cutoff){print}}' >${filterInputFile}
-fi
+    if [[ "${input_file##*.}" == "gz" ]]; then
+        zcat ${input_file} | snpID2bed.py -i ${snp_col} --no-chr | awk -v cutoff=${cutoff} -v p_col=${pvalue_col} 'NR==1{print;next}{if($(p_col+5) > cutoff){print}}' >${filterInputFile}
 
+    else
+        cat ${input_file} | snpID2bed.py -i ${snp_col} --no-chr | awk -v cutoff=${cutoff} -v p_col=${pvalue_col} 'NR==1{print;next}{if($(p_col+5) > cutoff){print}}' >${filterInputFile}
+    fi
+fi
 cat ${filterInputFile} | awk '{print $1,$2}' >${posFile}
 
 cat ${filterInputFile} | wcut -f6--1 >${filterInputFile}.tmp

@@ -2,8 +2,8 @@
 #########################################################
 # Function : Conditional Analysis By regenie            #
 # Platform : All Linux Based Platform                   #
-# Version  : 1.1                                        #
-# Date     : 2023-06-13                                 #
+# Version  : 1.2                                        #
+# Date     : 2023-06-15                                 #
 # Author   : Tingfeng Xu                                #
 # Contact  : xutingfeng@big.ac.cn                       #
 #########################################################
@@ -209,10 +209,10 @@ for ((count = 0; count <= ${maxcount}; count++)); do
     # while [[ -n "${LOG10P}" && -n "${FREQ}" ]] && [ ${count} -le ${maxcount} ]; do
     # run regenie
     echo "-------------BEGIN OF epoch :${count} -------------"
+    currentDir=${outputPath}/cond_${count}
 
     if [[ "${count}" -eq 0 ]]; then
         # Step1 run regenie step2
-        currentDir=${outputPath}/step2
         mkdir -p ${currentDir}
 
         regenie --step 2 \
@@ -233,7 +233,6 @@ for ((count = 0; count <= ${maxcount}; count++)); do
             >/dev/null
 
     else
-        currentDir=${outputPath}/cond_${count}
         mkdir -p ${currentDir}
         currentCondList=${currentDir}/cond.snplist
         tail -n +2 ${leadingFile} | awk '{print $3}' >${currentCondList}
@@ -296,9 +295,9 @@ for ((count = 0; count <= ${maxcount}; count++)); do
     # 写入header
 
     if [[ "${count}" -eq 0 ]]; then # 写入header
-        read currentSNP FREQ LOG10P <<<"$(zcat ${currentRegenieOutPut}.gz | awk 'NR==1{print;next}NR>=2{print | "sort -k12gr"}' | awk -v freqCUTOFF=${defaultFREQ} -v LOG10PCUTOFF=${defaultLOG10P} 'NR==1{print;next}{if ($6 > freqCUTOFF && $12 >LOG10PCUTOFF){print;exit}}' | tee ${leadingFile} | awk 'BEGIN{OFS=" "}{print $3, $6, $12}')"
+        read currentSNP FREQ LOG10P <<<"$(zcat ${currentRegenieOutPut}.gz | awk 'NR==1{print;next}NR>=2{print | "sort -k12gr"}' | awk -v freqCUTOFF=${defaultFREQ} -v LOG10PCUTOFF=${defaultLOG10P} 'NR==1{print $0, "FAILDTIME";next}{if ($6 > freqCUTOFF && $12 >LOG10PCUTOFF){print $0, "leading";exit}}' | tee ${leadingFile} | awk 'BEGIN{OFS=" "}NR==2{print $3, $6, $12}')"
     else # 不写入header
-        read currentSNP FREQ LOG10P <<<"$(zcat ${currentRegenieOutPut}.gz | awk 'NR>=2{print | "sort -k12gr"}' | awk -v freqCUTOFF=${defaultFREQ} -v LOG10PCUTOFF=${defaultLOG10P} '{if ($6 > freqCUTOFF && $12 >LOG10PCUTOFF){print;exit}}' | tee -a ${leadingFile} | awk 'BEGIN{OFS=" "}{print $3, $6, $12}')"
+        read currentSNP FREQ LOG10P <<<"$(zcat ${currentRegenieOutPut}.gz | awk 'NR>=2{print | "sort -k12gr"}' | awk -v freqCUTOFF=${defaultFREQ} -v LOG10PCUTOFF=${defaultLOG10P} '{if ($6 > freqCUTOFF && $12 >LOG10PCUTOFF){print $0, "leading";exit}}' | tee -a ${leadingFile} | awk 'BEGIN{OFS=" "}{print $3, $6, $12}')"
     fi
     # 提取排除 的SNP
     if [[ "$exclude_mode" = true ]]; then
@@ -312,11 +311,14 @@ for ((count = 0; count <= ${maxcount}; count++)); do
     # 更新计数器
     if [[ -n "${LOG10P}" && -n "${FREQ}" ]]; then
         echo -e "epoch\tID\tFREQ\tLOG10P\ncond_${count}\t${currentSNP}\t${FREQ}\t${LOG10P}" | column -t
+        echo "-------------END OF epoch:${count}  -------------"
+
     else
         echo "No SNP passed the filter at epoch ${count}!!!!!"
+        echo "-------------END OF epoch:${count}  -------------"
+
         break
     fi
-    echo "-------------END OF epoch:${count}  -------------"
 done
 leadingSNPList=${outputPath}/leading.snplist
 tail -n +2 ${leadingFile} | awk '{print $3}' >${leadingSNPList}
@@ -327,7 +329,7 @@ if [ "$exclude_mode" = true ]; then
     # excludeSNPList_current=${outputPath}/exclude.snplist
     finalKeepFile=${outputPath}/keep.regenie
 
-    zcat "${currentRegenieOutPut}".gz | awk -v excludeLOG10PCUTOFF="${excludeLOG10PCUTOFF}" -v currentCount=${count} 'NR==1{print;next}$12 >=excludeLOG10PCUTOFF {print $0, "keep"}' >${finalKeepFile}
+    zcat "${currentRegenieOutPut}".gz | awk -v excludeLOG10PCUTOFF="${excludeLOG10PCUTOFF}" -v currentCount=${count} 'NR==1{print $0, "FAILDTIME";next}$12 >=excludeLOG10PCUTOFF {print $0, "keep"}' >${finalKeepFile}
     # merge all
     cat ${leadingFile} <(tail -n +2 ${finalKeepFile}) <(tail -n +2 ${excludeSNPFile}) >${finalFile}
 
