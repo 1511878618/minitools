@@ -23,7 +23,9 @@ usage() {
     --max-condsnp  <value>           max cond snp, default value is 100
     --defaultLOG10P <value>         default log10p cutoff, default value is 6
     --defaultFREQ <value>           default freq cutoff, default value is 1e-2
-    --bt                             bt mode, default is false, and be qt model   
+    --bt                             bt mode, default is false, and be qt model
+    --keep <keepFile>                   keep ID file, 用于限定使用的人群，如果不指定则使用全体样本
+
 
 示例:
     $(basename "$0") -p <pfile> --phenoFile <phenoFile> --pheno <pheno> -t <threads> --step1 <step1> -o <out>
@@ -50,6 +52,7 @@ maxcount=100
 defaultLOG10P=6
 defaultFREQ=1e-2
 regenie_mode="--qt"
+keep_files=""
 # 定义必需的参数列表
 required_params=("pgenPath" "phenoFile" "pheno" "predFile")
 set -e
@@ -154,8 +157,17 @@ while [[ $# -gt 0 ]]; do
     --bt)
         regenie_mode="--bt --firth --approx --pThresh 0.01"
         echo "$1"
-
         shift
+        ;;
+    --keep)
+        if [[ -z "$2" || "$2" == -* ]]; then
+            echo "错误: --keep 参数需要提供一个值" >&2
+            exit 1
+        fi
+
+        keep_files="--keep $2"
+        echo ${keep_files}
+        shift 2
         ;;
     -h | --help)
         usage
@@ -221,6 +233,7 @@ for ((count = 0; count <= ${maxcount}; count++)); do
             --pgen ${pgenPath} \
             --phenoFile ${phenoFile} \
             --phenoCol ${pheno} \
+            ${keep_files} \
             ${regenie_mode} \
             --covarFile /pmaster/xutingfeng/dataset/ukb/phenotype/regenie.cov \
             --covarColList genotype_array,inferred_sex,age_visit,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,assessment_center,age_squared \
@@ -254,6 +267,7 @@ for ((count = 0; count <= ${maxcount}; count++)); do
                 --phenoCol ${pheno} \
                 --condition-list ${currentCondList} \
                 --exclude ${excludeSNPListCurrent} \
+                ${keep_files} \
                 ${regenie_mode} \
                 --covarFile /pmaster/xutingfeng/dataset/ukb/phenotype/regenie.cov \
                 --covarColList genotype_array,inferred_sex,age_visit,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,assessment_center,age_squared \
@@ -275,6 +289,7 @@ for ((count = 0; count <= ${maxcount}; count++)); do
                 --phenoFile ${phenoFile} \
                 --phenoCol ${pheno} \
                 --condition-list ${currentCondList} \
+                ${keep_files} \
                 ${regenie_mode} \
                 --covarFile /pmaster/xutingfeng/dataset/ukb/phenotype/regenie.cov \
                 --covarColList genotype_array,inferred_sex,age_visit,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,assessment_center,age_squared \
