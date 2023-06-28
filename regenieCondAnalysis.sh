@@ -2,7 +2,7 @@
 #########################################################
 # Function : Conditional Analysis By regenie            #
 # Platform : All Linux Based Platform                   #
-# Version  : 1.2                                        #
+# Version  : 1.3                                        #
 # Date     : 2023-06-15                                 #
 # Author   : Tingfeng Xu                                #
 # Contact  : xutingfeng@big.ac.cn                       #
@@ -55,7 +55,7 @@ regenie_mode="--qt"
 keep_files=""
 # 定义必需的参数列表
 required_params=("pgenPath" "phenoFile" "pheno" "predFile")
-set -e
+# set -e
 # 解析命令行参数
 while [[ $# -gt 0 ]]; do
     key="$1"

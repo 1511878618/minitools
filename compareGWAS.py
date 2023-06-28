@@ -40,6 +40,7 @@ def getParser():
     parser.add_argument("--ylabel", dest="ylabel", help="ylabel")
     parser.add_argument("--gzip", dest="gzip", help="gzip file", action="store_true")
     parser.add_argument("--resetID", dest="reset", help="resetID", action="store_true")
+    parser.add_argument("-s", dest="s",help="scatter dot size", default=4, type=float)
     return parser
 
 
@@ -96,6 +97,7 @@ if __name__ == "__main__":
     resetID = args.reset
     xlabel = args.xlabel
     ylabel = args.ylabel
+    s = args.s
     num_files = len(files)
     if num_files % 2 != 0:
         parser.error("每个文件需要指定一个类型")
@@ -128,10 +130,10 @@ if __name__ == "__main__":
         x=f"{axisList[0]}",
         y=f"{axisList[1]}",
         hue=compare.columns[2],
-        s=2,
-        ax=ax,
+        s=s,
+        ax=ax,zorder=2
     )
-    ax.plot(ax.get_xlim(), ax.get_ylim(), "--c")
+    ax.plot(ax.get_xlim(), ax.get_ylim(), "--c", zorder=1)
 
     if xlabel:
         ax.set_xlabel(xlabel)

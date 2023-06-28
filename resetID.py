@@ -123,24 +123,27 @@ def getParser():
     )
     return parser
 
-def formatChr(x):
-    if x.startswith("chr"):
-        return x
-    elif x.isdigit():
-        if int(x) < 23:
-            return "chr" + str(int(x))
-        else:
-            if x == "23":
-                return "chrX"
-            elif x == "24":
-                return "chrY"
-            elif x == "25":
-                return "chrX"
-            elif x == "26":
-                return "chrMT"
+def formatChr(x, nochr=False):
+    if nochr:
+        return x.replace("chr", "")
     else:
-        return x
-    
+        if x.startswith("chr"):
+            return x
+        elif x.isdigit():
+            if int(x) < 23:
+                return "chr" + str(int(x))
+            else:
+                if x == "23":
+                    return "chrX"
+                elif x == "24":
+                    return "chrY"
+                elif x == "25":
+                    return "chrX"
+                elif x == "26":
+                    return "chrMT"
+        else:
+            return x
+
 
 def resetID(line, orderList, IncludeOld=False, is_sort=False, delimter=None,addChr=False):
     """
@@ -166,8 +169,8 @@ def resetID(line, orderList, IncludeOld=False, is_sort=False, delimter=None,addC
     else:
         stemp = [A0, A1]
 
-    if addChr:
-        chr = formatChr(chr)
+    # if addChr:
+    chr = formatChr(chr, not addChr) # addChr is True, then nochr is False, so formatChr will add chr for chr col of ID
 
     newID = chr + ':' + pos + ':' + stemp[0] + ':' + stemp[1]
     if IncludeOld:  # 是否包含oldID
@@ -196,7 +199,6 @@ if __name__ == "__main__":
     delimter = args.delimter
     header = args.header
     addChr = args.addChr
-
     # check header and comments
     if comment is not None and header:
         raise ValueError(

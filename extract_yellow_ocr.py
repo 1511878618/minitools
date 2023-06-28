@@ -38,7 +38,7 @@ def extract_yellow(imagePath, outputPath):
         # 裁剪并保存黄色区域
         yellow_area = image[y:y + h, x:x + w]
         cv2.imwrite(osp.join(outputPath,f"{imageName}.jpg"), yellow_area)
-        return yellow_area
+        return yellow_area, max_contour
     else:
         return None
 
@@ -71,10 +71,14 @@ if __name__ == "__main__":
     imagePath=args.imagePath
     outputPath=args.outputPath
     imageName=osp.splitext(osp.split(imagePath)[-1])[0]
-    image = extract_yellow(imagePath, outputPath)
+    image,max_contour = extract_yellow(imagePath, outputPath)
+    area = cv2.contourArea(max_contour)
+
     if image is not None:
         ocr = PaddleOCR(use_angle_cls=True, lang="ch",use_gpu=False)  # need to run only once to download and load model into memory
         result = ocr.ocr(image, cls=True)
         if len(result[0]) >0:  # result: [[]]
             pd.DataFrame([i[1] for i in result[0]], columns=["string", "score"]).to_csv(osp.join(outputPath,f"{imageName}.csv"), index=False)
-    
+        else:
+            if area > 20000:
+                pd.DataFrame().to_csv(osp.join(outputPath,f"{imageName}.csv"), index=False)    

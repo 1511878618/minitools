@@ -96,30 +96,33 @@ def getParser():
     return parser
 
 
-def formatChr(x):
-    if x.startswith("chr"):
-        return x
-    elif x.isdigit():
-        if int(x) < 23:
-            return "chr" + str(int(x))
-        else:
-            if x == "23":
-                return "chrX"
-            elif x == "24":
-                return "chrY"
-            elif x == "25":
-                return "chrX"
-            elif x == "26":
-                return "chrMT"
+def formatChr(x, nochr=False):
+    if nochr:
+        return x.replace("chr", "")
     else:
-        return x
+        if x.startswith("chr"):
+            return x
+        elif x.isdigit():
+            if int(x) < 23:
+                return "chr" + str(int(x))
+            else:
+                if x == "23":
+                    return "chrX"
+                elif x == "24":
+                    return "chrY"
+                elif x == "25":
+                    return "chrX"
+                elif x == "26":
+                    return "chrMT"
+        else:
+            return x
 
 
 def reformat(line, idCol=1, idSep=":", colSep=None, nochr=False):
     lineList = line.split(colSep)
     idList = lineList[idCol - 1].split(idSep)
-    if not nochr: 
-        idList[0] = formatChr(idList[0])
+    
+    idList[0] = formatChr(idList[0], nochr)
 
     if colSep is None:
         colSep = " "
