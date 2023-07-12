@@ -131,9 +131,9 @@ if __name__ == "__main__":
             face_img_path = osp.join(SAVE_DIR, pic)
             cv2.imwrite(face_img_path, face_img_crop)
             # save log 
-            logList.append({"img":pic, "bbox":adj_bbox, "model":model,"confidence":confidence, "expand_ratio":expand_ratio, "status":"success"})
+            logList.append({"img":pic, "bbox":adj_bbox, "model":model,"confidence":confidence, "expand_ratio":expand_ratio, "status":"success", "raw_w":rawImg_shape[0], "raw_h":rawImg_shape[1], "bbox_top":bbox[0], "bbox_right":bbox[1], "bbox_bottom":bbox[2], "bbox_left":bbox[3]})
         else:
-            logList.append({"img":pic, "bbox":adj_bbox, "model":model,"confidence":0, "expand_ratio":expand_ratio, "status":"fail"})
+            logList.append({"img":pic, "bbox":adj_bbox, "model":model,"confidence":0, "expand_ratio":expand_ratio, "status":"fail", "raw_w":rawImg_shape[0], "raw_h":rawImg_shape[1], "bbox_top":bbox[0], "bbox_right":bbox[1], "bbox_bottom":bbox[2], "bbox_left":bbox[3]})
             print(f"no face detected in {pic_path}")
     # save log
     pd.DataFrame(logList).to_csv(osp.join(SAVE_DIR, "log.csv"), index=False)

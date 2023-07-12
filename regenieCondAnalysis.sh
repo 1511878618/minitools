@@ -242,8 +242,7 @@ for ((count = 0; count <= ${maxcount}; count++)); do
             --bsize 1000 \
             --out ${currentDir}/ \
             --minMAC 1 \
-            --pred ${predFile} \
-            >/dev/null
+            --pred ${predFile}
 
     else
         mkdir -p ${currentDir}
