@@ -66,11 +66,7 @@ def getParser():
             --keep 保留原始ID
             --header 有header的时候，它会默认忽略第一行，直接输出；而使用--comment的时候，直接输出所有以comment开头的所有行；二者不可以同时使用。
             Assume IDCol should be: chr:pos:ref:alt
-        
-        
-
-
-
+    
         """
         ),
     )
@@ -81,7 +77,7 @@ def getParser():
         dest="col_order",
         default=[],
         nargs="+",
-        help="default is -i 3 1 2 4 5 . -i 2 1 4 5 6 => ID col is 2, chr col is 1, pos col is 4, ref col is 5, alt col is 6. Note col index start from 1.如果已经是这个格式了则可以直接 -i 3， 然后进行下面的操作",
+        help="default is -i 2 1 4 5 6 => ID col is 2, chr col is 1, pos col is 4, ref col is 5, alt col is 6. Note col index start from 1.如果已经是这个格式了则可以直接 -i 3， 然后进行下面的操作",
         type=str,
     )
     parser.add_argument(
@@ -138,7 +134,7 @@ def formatChr(x, nochr=False):
                 elif x == "24":
                     return "chrY"
                 elif x == "25":
-                    return "chrX"
+                    return "chrXY"
                 elif x == "26":
                     return "chrMT"
         else:

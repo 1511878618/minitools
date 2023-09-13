@@ -92,6 +92,7 @@ for param in "${required_params[@]}"; do
 done
 
 # 输出缺少的必需参数并退出
+
 if [ ${#missing_params[@]} -gt 0 ]; then
     echo "缺少必需的参数: ${missing_params[*]}" >&2
     usage
@@ -127,11 +128,13 @@ plink2 --pfile ${imputationFilePath} --exclude ${tmpWESSNPList} --keep ${keepID}
 plink2 --pfile ${wesFilePath} --keep ${keepID} --make-pgen --out ${tmpWES} --threads ${threadNumber} --indiv-sort n --sort-vars n >/dev/null
 #### 输出SNP的变化情况
 afterExclude=$(cat ${tmpIMPUTATIONExcludeWESSNP}.pvar | wc -l)
-echo "与WES存在重合数目为：$((${beforeExclude} - ${afterExclude}))"
-echo "IMPUTATION有SNP${beforeExclude}"
-echo "排除这部分后IMP数据的SNP数目为：${afterExclude}"
 wesSNPCount=$(cat ${wesFilePath}.pvar | wc -l)
+
 echo "WES数据的SNP数目为：${wesSNPCount}"
+echo "IMPUTATION有SNP${beforeExclude}"
+echo "与WES存在重合数目为：$((${beforeExclude} - ${afterExclude}))"
+echo "排除这部分后IMP数据的SNP数目为：${afterExclude}"
+
 #### 输出sample变化情况
 echo "WES有$(tail -n +2 ${wesFilePath}.psam | wc -l)个样本"
 echo "imputation有$(tail -n +2 ${imputationFilePath}.psam | wc -l)个样本"

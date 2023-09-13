@@ -2,8 +2,8 @@
 #########################################################
 # Function : Conditional Analysis By regenie            #
 # Platform : All Linux Based Platform                   #
-# Version  : 1.5                                        #
-# Date     : 2023-08-23                                 #
+# Version  : 1.4                                        #
+# Date     : 2023-08-07                                 #
 # Author   : Tingfeng Xu                                #
 # Contact  : xutingfeng@big.ac.cn                       #
 #########################################################
@@ -18,7 +18,6 @@ usage() {
     --pheno <pheno>                  pheno name, must be specified
     -t, --threads <threads>         threads, default value is 20
     --step1 <step1>                 step1 pred file path, must be specified
-    --step2 <step2>                 step2 pred file path, optional
     -o, --out <out>                 output prefix, default value is ./conditionalAnalysis
     --exclude-mode <log10p_cutoff>  exclude mode, optional parameter, log10p_cutoff
     --max-condsnp  <value>           max cond snp, default value is 100
@@ -57,7 +56,7 @@ defaultLOG10P=6
 defaultFREQ=1e-2
 regenie_mode="--qt"
 keep_files=""
-covarFile="${scriptPath}/sup/regenie.cov"
+covarFile="${scriptPath}/regenie.cov"
 # 定义必需的参数列表
 required_params=("pgenPath" "phenoFile" "pheno" "predFile")
 
@@ -108,16 +107,6 @@ while [[ $# -gt 0 ]]; do
             exit 1
         fi
         predFile=$2
-        echo "$1 $2"
-
-        shift 2
-        ;;
-    --step2)
-        if [[ -z "$2" || "$2" == -* ]]; then
-            echo "错误: --step2 参数需要提供一个值" >&2
-            exit 1
-        fi
-        step2File=$2
         echo "$1 $2"
 
         shift 2
@@ -226,7 +215,6 @@ echo "phenoFile 参数值: $phenoFile"
 echo "pheno 参数值: $pheno"
 echo "threads 参数值: $threads"
 echo "step1 参数值: $predFile"
-echo "step2 参数值: $step2File"
 echo "out 参数值: $outputPath"
 echo "regenie flag: $regenie_mode"
 echo "max-condsnp 参数值: $maxcount"
@@ -243,7 +231,7 @@ if [ "$exclude_mode" = true ]; then
 fi
 
 # Export environments variable for regenie
-alias regenie=${scriptPath}/bin/regenie_v3.2.6.gz_x86_64_Linux_mkl
+# alias regenie=${scriptPath}/bin/regenie_v3.2.6.gz_x86_64_Linux_mkl
 
 mkdir -p ${outputPath}
 leadingFile=${outputPath}/leading.regenie
@@ -256,36 +244,23 @@ for ((count = 0; count <= ${maxcount}; count++)); do
     if [[ "${count}" -eq 0 ]]; then
         # Step1 run regenie step2
         mkdir -p ${currentDir}
-        # 不存在step2File则直接运行step2
-        if [[ -z "${step2File}" ]]; then
-            regenie --step 2 \
-                --threads=${threads} \
-                --ref-first \
-                --pgen ${pgenPath} \
-                --phenoFile ${phenoFile} \
-                --phenoCol ${pheno} \
-                ${keep_files} \
-                ${regenie_mode} \
-                --covarFile ${covarFile} \
-                --covarColList genotype_array,inferred_sex,age_visit,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,assessment_center,age_squared \
-                --catCovarList genotype_array,inferred_sex,assessment_center \
-                --maxCatLevels 30 \
-                --bsize 1000 \
-                --out ${currentDir}/ \
-                --minMAC 1 \
-                --pred ${predFile}
-        else
-            echo "存在step2File，cp file" # this is not good, TODO: change to ln or others
-            if [[ ! -f "${step2File}" ]]; then
-                echo "step2File:${step2File} 不存在"
-                exit 1
-            fi
-            if [[ ${step2File} == *.gz ]]; then
-                cp ${step2File} ${currentDir}/_${pheno}.regenie.gz
-            else
-                cp ${step2File} ${currentDir}/_${pheno}.regenie
-            fi
-        fi
+
+        regenie --step 2 \
+            --threads=${threads} \
+            --ref-first \
+            --pgen ${pgenPath} \
+            --phenoFile ${phenoFile} \
+            --phenoCol ${pheno} \
+            ${keep_files} \
+            ${regenie_mode} \
+            --covarFile ${covarFile} \
+            --covarColList genotype_array,inferred_sex,age_visit,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PC10,assessment_center,age_squared \
+            --catCovarList genotype_array,inferred_sex,assessment_center \
+            --maxCatLevels 30 \
+            --bsize 1000 \
+            --out ${currentDir}/ \
+            --minMAC 1 \
+            --pred ${predFile}
 
     else
         mkdir -p ${currentDir}
@@ -300,7 +275,7 @@ for ((count = 0; count <= ${maxcount}; count++)); do
             echo "exclude $(cat ${excludeSNPListCurrent} | wc -l) SNPs in ${count} conditionalAnalysis"
 
             # Step2.2 conditional analysis
-            echo "running ${count} ........"
+            # echo "running ${count} ........"
             regenie --step 2 \
                 --threads=${threads} \
                 --ref-first \
@@ -318,8 +293,8 @@ for ((count = 0; count <= ${maxcount}; count++)); do
                 --bsize 1000 \
                 --out ${currentDir}/ \
                 --minMAC 1 \
-                --pred ${predFile}
-            # >/dev/null
+                --pred ${predFile} \
+                >/dev/null
 
         else
             # Step2.2 conditional analysis
@@ -340,20 +315,15 @@ for ((count = 0; count <= ${maxcount}; count++)); do
                 --bsize 1000 \
                 --out ${currentDir}/ \
                 --minMAC 1 \
-                --pred ${predFile}
-            # >/dev/null
+                --pred ${predFile} \
+                >/dev/null
 
         fi
 
     fi
     # 对输出处理
-
     currentRegenieOutPut=${currentDir}/_${pheno}.regenie
-
-    if [[ -s ${currentRegenieOutPut} ]]; then
-        gzip ${currentRegenieOutPut}
-    fi
-
+    gzip ${currentRegenieOutPut}
     # 写入header
 
     if [[ "${count}" -eq 0 ]]; then # 写入header
