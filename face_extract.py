@@ -9,19 +9,51 @@ import cv2
 import textwrap
 
 
-def adjust_rect(bbox, img_shape, ratio=0.2):
-    # img_shape should be [w, h]
-    # bbox = [top, right, bottom, left]
+# def adjust_rect(bbox, img_shape, ratio=0.2):
+#     # img_shape should be [w, h]
+#     # bbox = [top, right, bottom, left]
 
-    rect = bbox
-    top, right, bottom, left = rect
+#     rect = bbox
+#     top, right, bottom, left = rect
+#     h = bottom - top
+#     w = right - left
+#     ntop = max(0, top - 2 * ratio * h)
+#     nbottom = min(img_shape[1], bottom + 2 * ratio * h)
+#     nleft = max(0, left - 2 * ratio * w)
+#     nright = min(img_shape[0], right + 2 * ratio * w)
+#     return [int(ntop), int(nright), int(nbottom), int(nleft)]
+
+
+
+
+def ensure_dirs(path):
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+
+def adjust_rect(bbox, imgSize, oneside_ratio=1):
+    # imgSize = (height, width, ...)
+    # cv2.shape is height, width, channel
+
+    top, right, bottom, left = bbox
+    height, width, _ = imgSize
+
     h = bottom - top
     w = right - left
-    ntop = max(0, top - 2 * ratio * h)
-    nbottom = min(img_shape[1], bottom + 2 * ratio * h)
-    nleft = max(0, left - 2 * ratio * w)
-    nright = min(img_shape[0], right + 2 * ratio * w)
-    return [int(ntop), int(nright), int(nbottom), int(nleft)]
+    side = max(h, w)
+    c_x = (left + right) // 2
+    c_y = (top + bottom) // 2
+
+    new_top = max(0, c_y - oneside_ratio * side // 2)
+    new_bottom = min(height, c_y + oneside_ratio * side // 2)
+    new_left = max(0, c_x - oneside_ratio * side // 2)
+    new_right = min(width, c_x + oneside_ratio * side // 2)
+
+    return [int(new_top), int(new_right), int(new_bottom), int(new_left)]
+
+
+
+
 
 
 def ensure_dirs(path):
@@ -151,7 +183,7 @@ if __name__ == "__main__":
     # optional
     model = args.model
     min_confidence = args.min_confidence
-    expand_ratio = args.expand_ratio
+    expand_ratio = 1 + args.expand_ratio
     size = args.size
 
     print(f"IMG_PATH is {IMG_PATH}")
@@ -184,7 +216,7 @@ if __name__ == "__main__":
             # cv2 shape is [h, w, c] => [w, h]
             rawImg_shape = [rawImg.shape[1], rawImg.shape[0]]
             # recrop
-            adj_bbox = adjust_rect(bbox, rawImg.shape, ratio=expand_ratio)
+            adj_bbox = adjust_rect(bbox, rawImg.shape, oneside_ratio=expand_ratio)
             top, right, bottom, left = adj_bbox
             face_img_crop = rawImg[top:bottom, left:right]
             face_img_crop_resize = cv2.resize(face_img_crop, (size, size))
