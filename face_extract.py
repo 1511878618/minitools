@@ -222,7 +222,7 @@ if __name__ == "__main__":
             face_img_crop_resize = cv2.resize(face_img_crop, (size, size))
             # save face img
             face_img_path = osp.join(SAVE_DIR, pic)
-            cv2.imwrite(face_img_path, face_img_crop)
+            cv2.imwrite(face_img_path, face_img_crop_resize)
             # save log
             logList.append(
                 {
